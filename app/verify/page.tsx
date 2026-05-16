@@ -25,7 +25,7 @@ type VerifyResult = {
   status: "verified";
   txHash: string;
   validUntil: number;
-  contractAddress: string;
+  contractAddress?: string;
 };
 
 type Phase =
@@ -328,6 +328,9 @@ export default function VerifyPage() {
             txHash={undefined}
             validUntil={humanUntil ? Number(humanUntil) : undefined}
             chainName={monadTestnet.name}
+            walletAddress={address}
+            contractAddress={CONTRACT_ADDRESS}
+            showActions
             className="mb-6"
           />
 
@@ -642,6 +645,9 @@ export default function VerifyPage() {
                   txHash={verifyResult.txHash}
                   validUntil={verifyResult.validUntil}
                   chainName={monadTestnet.name}
+                  walletAddress={address}
+                  contractAddress={verifyResult.contractAddress ?? CONTRACT_ADDRESS}
+                  showActions
                   className="mb-6"
                 />
 

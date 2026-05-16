@@ -67,11 +67,18 @@ export async function GET(request: NextRequest) {
   const status = getStatus(isHuman, humanUntil, nowSeconds);
   const latestProof = getProof(address);
 
-  return NextResponse.json({
-    address,
-    status,
-    humanUntil,
-    secondsRemaining: getSecondsRemaining(status, humanUntil, nowSeconds),
-    ...(latestProof ? { latestTxHash: latestProof.txHash } : {}),
-  });
+  return NextResponse.json(
+    {
+      address,
+      status,
+      humanUntil,
+      secondsRemaining: getSecondsRemaining(status, humanUntil, nowSeconds),
+      ...(latestProof ? { latestTxHash: latestProof.txHash } : {}),
+    },
+    {
+      headers: {
+        "Cache-Control": "public, s-maxage=15, stale-while-revalidate=30",
+      },
+    }
+  );
 }

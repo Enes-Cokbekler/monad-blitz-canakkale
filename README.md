@@ -1,6 +1,18 @@
 # HumanPass
 
-A proof-of-human session layer on Monad for consumer apps.
+A proof-of-human session layer on Monad for consumer apps. Any app can gate actions behind a HumanPass check. Bots and AI agents are blocked at the protocol level — no extra code needed per-app.
+
+## Pages
+
+| Route | Description |
+|---|---|
+| `/` | Landing page |
+| `/verify` | Complete human challenge, get on-chain proof |
+| `/vote` | Protected voting demo (HumanPass-gated) |
+| `/status` | Look up any wallet's proof status |
+| `/humans` | Live feed of verified human wallets |
+| `/simulator` | Bot Attack Simulator — watch bots get blocked in real time |
+| `/developers` | Integration docs and code examples |
 
 ## Setup
 
@@ -102,15 +114,56 @@ This MVP stores temporary challenge state in memory. That means:
 - It is not safe for serverless deployments where each request may hit a different instance.
 - For production, replace in-memory state with Redis or a database.
 
-## Demo Script Summary
+## Developer Integration
 
-1. Open the HumanPass landing page.
-2. Explain the problem: AI agents and bots are flooding consumer apps.
-3. Connect a wallet.
-4. Try to vote without verification. The app blocks the action.
-5. Complete the human challenge.
-6. A HumanPass proof is issued on Monad.
-7. Show the proof status page.
-8. Return to the voting app and vote successfully.
-9. Show live result updates.
-10. Explain how any consumer app can integrate HumanPass.
+HumanPass exposes a single read function: `isHuman(address) → bool`.
+
+**Solidity — gate a contract function:**
+```solidity
+interface IHumanPass {
+    function isHuman(address wallet) external view returns (bool);
+}
+
+modifier onlyHuman() {
+    require(IHumanPass(HUMANPASS_CONTRACT).isHuman(msg.sender), "No HumanPass");
+    _;
+}
+```
+
+**TypeScript / viem — check off-chain:**
+```ts
+const isVerified = await client.readContract({
+  address: HUMANPASS_CONTRACT,
+  abi: [{ name: "isHuman", type: "function", stateMutability: "view",
+          inputs: [{ name: "wallet", type: "address" }],
+          outputs: [{ name: "", type: "bool" }] }],
+  functionName: "isHuman",
+  args: [walletAddress],
+});
+```
+
+See `/developers` for full examples including React/wagmi gate component.
+
+## Bot Attack Simulator
+
+Open `/simulator` to watch the protection in action:
+
+- AI agents and bots continuously attempt protected actions (vote, claim reward, join game).
+- Every unverified request is blocked with the reason shown (e.g. "No HumanPass").
+- Verified human wallets pass through.
+- Live counters show total attempts, bots blocked, humans accepted, and protection rate.
+
+Use this during a demo to make the value of HumanPass obvious in under 10 seconds.
+
+## Demo Script
+
+1. Open `/` and explain the problem: AI agents and bots flood consumer apps.
+2. Open `/simulator` — hit "Start Simulation". Judges watch bots get blocked in real time.
+3. Point out the protection rate counter (typically 75–85%).
+4. Connect a wallet. Open `/verify` and complete the human challenge.
+5. Show the Verified Human proof card — wallet, tx hash, expiry, contract address.
+6. Open `/vote` — vote successfully as a verified human.
+7. Open `/status` — show the on-chain proof is queryable for any wallet.
+8. Open `/humans` — show the live feed of verified wallets.
+9. Open `/developers` — show that any app integrates with one function call.
+10. Close: "One proof layer. Any consumer app on Monad. Bots out, humans in."
