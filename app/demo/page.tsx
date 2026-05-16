@@ -15,8 +15,8 @@ const DEMO_STEPS = [
   {
     id: "blocked",
     label: "02 · Bot Blocked",
-    title: "Without HumanPass, bots get through.",
-    body: "Any wallet can call your contract. Without a human signal, your reward pool, your vote, your airdrop — all are fair game for automation.",
+    title: "Bots fail at protected actions.",
+    body: "A bot tries to vote and claim the coffee reward. Both attempts are blocked because the wallet has no active HumanPass proof.",
     icon: "🚫",
     color: "orange",
   },
@@ -31,16 +31,16 @@ const DEMO_STEPS = [
   {
     id: "proof",
     label: "04 · Proof On-Chain",
-    title: "The proof lives on Monad.",
-    body: "A short-lived HumanPass proof is recorded on Monad Testnet. It is portable across every app on the network. Any contract can verify it with a single read: isHuman(address).",
+    title: "One proof unlocks multiple apps.",
+    body: "A short-lived HumanPass proof is recorded on Monad Testnet. The verified human can vote and claim the coffee reward using the same reusable proof.",
     icon: "⛓️",
     color: "purple",
   },
   {
     id: "dev",
     label: "05 · Developer Layer",
-    title: "Any app integrates in one line.",
-    body: "Smart contracts add the onlyHuman modifier. Frontend apps call useHumanPass(). The user only verifies once — every integrated app benefits from the same on-chain proof.",
+    title: "Any consumer app integrates one check.",
+    body: "Developers call requireHuman(wallet), then run the sensitive action: vote, claimReward, raffle entry, game move, or event perk.",
     icon: "🔧",
     color: "cyan",
   },
@@ -50,12 +50,12 @@ type DemoStep = (typeof DEMO_STEPS)[number];
 
 const BOT_LOG = [
   { agent: "Bot Agent #104", action: "tried to vote", blocked: true, reason: "No HumanPass" },
-  { agent: "AI Agent GPT-4o", action: "tried to claim reward", blocked: true, reason: "No HumanPass" },
+  { agent: "AI Agent #221", action: "tried to claim coffee coupon", blocked: true, reason: "No HumanPass" },
   { agent: "Sybil Node #7", action: "tried to join airdrop", blocked: true, reason: "Proof not found" },
   { agent: "Verified Human 0x1a2b", action: "completed challenge", blocked: false, reason: "Valid HumanPass" },
   { agent: "Bot Swarm (20 nodes)", action: "tried reward claims", blocked: true, reason: "No HumanPass" },
-  { agent: "AI Agent #33", action: "tried to submit proposal", blocked: true, reason: "No HumanPass" },
   { agent: "Verified Human 0x9f3c", action: "cast ballot", blocked: false, reason: "Valid HumanPass" },
+  { agent: "Verified Human 0x9f3c", action: "claimed coffee reward", blocked: false, reason: "Valid HumanPass" },
 ];
 
 const STEP_DURATION_MS = 12_000;
@@ -181,6 +181,9 @@ export default function DemoPage() {
             <Link href="/verify" className="btn-secondary">
               Verify Now →
             </Link>
+            <Link href="/rewards" className="btn-secondary">
+              Rewards Demo →
+            </Link>
           </div>
 
           {guideActive && (
@@ -234,15 +237,15 @@ export default function DemoPage() {
                         </div>
                         <ul className="divide-y divide-surface-border">
                           {[
-                            { agent: "Bot Agent #1", action: "tried to vote", result: "ACCEPTED ✓ (no protection)" },
-                            { agent: "Sybil Node #7", action: "claimed reward", result: "ACCEPTED ✓ (no protection)" },
-                            { agent: "AI Agent GPT-4o", action: "submitted proposal", result: "ACCEPTED ✓ (no protection)" },
+                            { agent: "Bot Agent #1", action: "tried to vote", result: "BLOCKED ✕ (No HumanPass)" },
+                            { agent: "AI Agent #221", action: "tried to claim coffee coupon", result: "BLOCKED ✕ (No HumanPass)" },
+                            { agent: "Bot Swarm", action: "attempted 20 reward claims", result: "20 BLOCKED ✕" },
                           ].map((row, j) => (
                             <li key={j} className="flex items-center justify-between px-4 py-2 text-xs">
                               <span className="text-text-secondary">
                                 <span className="font-semibold text-text-primary">{row.agent}</span> {row.action}
                               </span>
-                              <span className="font-semibold text-orange-400">{row.result}</span>
+                              <span className="font-semibold text-red-400">{row.result}</span>
                             </li>
                           ))}
                         </ul>
@@ -282,6 +285,8 @@ export default function DemoPage() {
                           <div className="flex justify-between"><span className="text-text-muted">Network</span><span className="rounded-full bg-monad-purple/20 px-2 py-0.5 text-xs font-semibold text-monad-purple-light">Monad Testnet</span></div>
                           <div className="flex justify-between"><span className="text-text-muted">Wallet</span><span className="font-mono text-text-primary">0x1a2b...3c4d</span></div>
                           <div className="flex justify-between"><span className="text-text-muted">Expires</span><span className="font-semibold text-emerald-400">9m 59s remaining</span></div>
+                          <div className="flex justify-between"><span className="text-text-muted">Vote</span><span className="font-semibold text-emerald-400">Accepted</span></div>
+                          <div className="flex justify-between"><span className="text-text-muted">Coffee reward</span><span className="font-semibold text-emerald-400">Accepted</span></div>
                           <div className="flex justify-between"><span className="text-text-muted">Contract</span><span className="font-mono text-text-secondary">0xABCD...1234</span></div>
                         </div>
                         <div className="mt-3 h-1 overflow-hidden rounded-full bg-surface-secondary">
@@ -299,9 +304,9 @@ modifier onlyHuman() {
 }
 
 // TypeScript
-const isHuman = await humanpass.isHuman(address);
-if (!isHuman) redirect("/verify");
-allowProtectedAction();
+const result = await requireHuman(wallet);
+if (!result.ok) throw new Error("HumanPass required");
+claimReward();
 
 // React
 const { isHuman, expiresAt } = useHumanPass(address);`}
@@ -336,9 +341,10 @@ const { isHuman, expiresAt } = useHumanPass(address);`}
         </div>
 
         {/* CTAs */}
-        <div className="mt-10 grid gap-4 sm:grid-cols-3">
+        <div className="mt-10 grid gap-4 sm:grid-cols-4">
           {[
             { href: "/verify", icon: "🛡️", label: "Get HumanPass", sub: "Complete a challenge, get proof" },
+            { href: "/rewards", icon: "☕", label: "Rewards Demo", sub: "Claim a protected perk" },
             { href: "/simulator", icon: "🤖", label: "Bot Simulator", sub: "Watch bots get blocked live" },
             { href: "/developers", icon: "🔧", label: "Developer Docs", sub: "Integrate in any app" },
           ].map((cta) => (

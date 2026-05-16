@@ -4,6 +4,7 @@ export type RateLimitAction =
   | "challenge_start"
   | "challenge_verify"
   | "vote"
+  | "reward_claim"
   | "global";
 
 type WindowEntry = { count: number; windowStart: number };
@@ -14,6 +15,7 @@ export const RATE_LIMITS: Record<RateLimitAction, { max: number; windowMs: numbe
   challenge_start:  { max: Number(process.env.RL_CHALLENGE_START_MAX  ?? 5),  windowMs: 60_000 },
   challenge_verify: { max: Number(process.env.RL_CHALLENGE_VERIFY_MAX ?? 10), windowMs: 60_000 },
   vote:             { max: Number(process.env.RL_VOTE_MAX             ?? 5),  windowMs: 60_000 },
+  reward_claim:     { max: Number(process.env.RL_REWARD_CLAIM_MAX     ?? 5),  windowMs: 60_000 },
   global:           { max: Number(process.env.RL_GLOBAL_MAX           ?? 30), windowMs: 60_000 },
 };
 

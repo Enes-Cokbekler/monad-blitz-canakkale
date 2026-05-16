@@ -17,7 +17,7 @@ const SDK_STATUS = `import { getHumanPassStatus } from "@/lib/humanpass-sdk";
 
 // Full status object — read once, use everywhere
 const status = await getHumanPassStatus(address);
-// {
+// { 
 //   address: "0x...",
 //   isHuman: true,
 //   humanUntil: 1747000000,     // Unix timestamp seconds
@@ -25,6 +25,16 @@ const status = await getHumanPassStatus(address);
 //   contractAddress: "0x...",
 //   chainId: 10143
 // }`;
+
+const REWARD_SNIPPET = `import { requireHuman } from "@/lib/humanpass-sdk";
+
+const result = await requireHuman(wallet);
+
+if (!result.ok) {
+  throw new Error("HumanPass required");
+}
+
+claimReward();`;
 
 const REACT_HOOK = `import { useReadContract } from "wagmi";
 import { humanPassAbi } from "@/lib/contracts/HumanPass.abi";
@@ -168,6 +178,10 @@ export default function DevelopersPage() {
           </p>
           <CodeBlock code={SDK_QUICKSTART} />
           <p className="mt-4 mb-2 text-sm text-text-secondary">
+            Reward claim example — the same check protects coffee coupons, event perks, and raffles:
+          </p>
+          <CodeBlock code={REWARD_SNIPPET} />
+          <p className="mt-4 mb-2 text-sm text-text-secondary">
             Or read the full status object:
           </p>
           <CodeBlock code={SDK_STATUS} />
@@ -287,7 +301,8 @@ export default function DevelopersPage() {
               "Governance — only real users vote on proposals, no sybil manipulation",
               "Gaming — bot-free leaderboards and matchmaking",
               "Airdrops — fair token distribution, no farming bots",
-              "Reward claims — no automated reward drain",
+              "Rewards and raffles — no automated coffee coupon, event perk, or prize drain",
+              "Event perks — snack passes, badge access, and attendee-only drops",
               "Chat & forums — eliminate AI spam at the protocol layer",
               "Events & tickets — one proof, one human, one entry",
             ].map((item) => (
@@ -335,6 +350,14 @@ export default function DevelopersPage() {
           </p>
         </div>
 
+        <div className="mb-10 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-5 py-4 text-sm text-text-secondary">
+          <p className="font-semibold text-emerald-400 mb-1">Reusable consumer protection</p>
+          <p>
+            HumanPass can protect rewards, raffles, event perks, games, votes, and other sensitive
+            consumer actions. Voting and the coffee coupon demo both read the same on-chain proof.
+          </p>
+        </div>
+
         {/* Positioning note */}
         <div className="mb-10 rounded-lg border border-surface-border bg-surface-secondary px-5 py-4 text-xs text-text-muted">
           <p className="font-semibold text-text-secondary mb-1">MVP note</p>
@@ -346,6 +369,7 @@ export default function DevelopersPage() {
           <Link href="/verify" className="btn-primary">Get Your HumanPass →</Link>
           <Link href="/simulator" className="btn-secondary">See Bot Simulator</Link>
           <Link href="/vote" className="btn-secondary">Vote Demo</Link>
+          <Link href="/rewards" className="btn-secondary">Rewards Demo</Link>
           <Link href="/demo" className="btn-secondary">60-Second Demo</Link>
         </div>
       </div>

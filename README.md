@@ -23,8 +23,9 @@ AI agents are flooding the internet. HumanPass lets apps verify real humans befo
 7. **Step 4 (Proof On-Chain):** HumanPass proof recorded on Monad. Show the Verified Human card.
 8. Open `/status` → paste the wallet address. Proof is readable by any app.
 9. Open `/vote` → vote successfully as a verified human. Unverified attempts are rejected.
-10. Open `/developers` → show the three-line integration. One modifier. One hook.
-11. Close: "One proof layer. Any consumer app on Monad. Bots out, humans in."
+10. Open `/rewards` → claim the Hackathon Coffee Coupon with the same proof. Duplicate claims are rejected.
+11. Open `/developers` → show the three-line integration. One modifier. One helper check.
+12. Close: "One proof layer. Any consumer app on Monad. Bots out, humans in."
 
 ---
 
@@ -36,6 +37,7 @@ AI agents are flooding the internet. HumanPass lets apps verify real humans befo
 | `/demo` | **Judge demo** — guided 60-second flow |
 | `/verify` | Complete challenge, receive on-chain proof |
 | `/vote` | Protected voting demo (HumanPass-gated) |
+| `/rewards` | Protected rewards demo (HumanPass-gated coffee coupon) |
 | `/status` | Look up any wallet's proof status |
 | `/humans` | Live feed of verified human wallets |
 | `/simulator` | Bot Attack Simulator — watch bots get blocked |
@@ -350,6 +352,22 @@ const { events } = await getHumanProofEventsForAddress(address);
 ## TypeScript Integration Helper
 
 `lib/humanpass-sdk.ts` provides a typed, viem-based helper that any frontend or server-side code can use to check HumanPass status.
+
+---
+
+## Second Consumer Demo: Protected Rewards
+
+Voting is one example of a sensitive consumer action. Rewards are another.
+
+The `/rewards` page demonstrates a HumanPass-protected claim flow for a mock **Hackathon Coffee Coupon**:
+
+- unverified wallets are blocked with `Active HumanPass proof required.`
+- verified humans can claim one mock reward code
+- duplicate claims from the same wallet are rejected
+- reward state is backend in-memory for the hackathon demo
+- no real coupons, payments, NFTs, databases, Redis, or external reward systems are involved
+
+Both `/vote` and `/rewards` use the same on-chain HumanPass proof issued by `/verify`. This shows HumanPass as a reusable verification layer: consumer apps can protect rewards, raffles, event perks, games, votes, and other sensitive actions with one proof check.
 
 **Functions:**
 

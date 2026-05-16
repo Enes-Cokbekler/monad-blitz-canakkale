@@ -28,7 +28,7 @@ const HUMAN_WALLETS = [
 
 const BOT_ACTIONS = [
   "tried to vote",
-  "tried to claim reward",
+  "tried to claim coffee coupon",
   "tried to join game",
   "tried to cast ballot",
   "tried to submit proposal",
@@ -38,14 +38,14 @@ const BOT_ACTIONS = [
 
 const HUMAN_ACTIONS = [
   "voted successfully",
-  "claimed reward",
+  "claimed coffee reward",
   "joined the game",
   "submitted proposal",
   "accessed airdrop",
 ];
 
 const SWARM_ACTIONS = [
-  "reward claims",
+  "coffee coupon claims",
   "vote attempts",
   "airdrop grabs",
   "proposal submissions",
@@ -89,9 +89,9 @@ function generateAttempt(id: number): Attempt {
       id,
       kind: "swarm",
       agent: `Bot Swarm (${count} nodes)`,
-      action: `tried ${count} simultaneous ${randomItem(SWARM_ACTIONS)}`,
+      action: `attempted ${count} ${randomItem(SWARM_ACTIONS)}`,
       blocked: true,
-      reason: "No HumanPass — entire swarm blocked",
+      reason: `${count} blocked — No HumanPass`,
       count,
       timestamp: Date.now(),
     };
@@ -302,6 +302,7 @@ export default function SimulatorPage() {
           <div className="mt-4 flex flex-wrap gap-3">
             <Link href="/developers" className="btn-primary text-sm">Integrate HumanPass →</Link>
             <Link href="/vote" className="btn-secondary text-sm">See Vote Demo</Link>
+            <Link href="/rewards" className="btn-secondary text-sm">See Rewards Demo</Link>
             <Link href="/demo" className="btn-secondary text-sm">60-Second Demo</Link>
           </div>
         </div>
