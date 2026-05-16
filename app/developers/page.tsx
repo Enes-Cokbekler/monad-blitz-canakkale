@@ -3,29 +3,44 @@ import Link from "next/link";
 const CONTRACT_ADDRESS =
   process.env.NEXT_PUBLIC_HUMANPASS_CONTRACT_ADDRESS ?? "0x<HumanPass Contract>";
 
-const SDK_QUICKSTART = `// Pseudocode — wraps the viem read below
-import { humanpass } from "@humanpass/sdk";
+const SDK_QUICKSTART = `import { requireHuman } from "@/lib/humanpass-sdk";
 
-const isHuman = await humanpass.isHuman(address);
+const result = await requireHuman(userAddress);
 
-if (!isHuman) {
-  redirect("/verify");
+if (!result.ok) {
+  redirect("/verify"); // reason: HUMANPASS_REQUIRED | PROOF_EXPIRED | INVALID_ADDRESS
 }
 
-allowProtectedAction();`;
+allowProtectedAction(); // result.status has full proof details`;
 
-const REACT_HOOK = `import { useHumanPass } from "@humanpass/react";
+const SDK_STATUS = `import { getHumanPassStatus } from "@/lib/humanpass-sdk";
+
+// Full status object — read once, use everywhere
+const status = await getHumanPassStatus(address);
+// {
+//   address: "0x...",
+//   isHuman: true,
+//   humanUntil: 1747000000,     // Unix timestamp seconds
+//   expiresInSeconds: 3547,
+//   contractAddress: "0x...",
+//   chainId: 10143
+// }`;
+
+const REACT_HOOK = `import { useReadContract } from "wagmi";
+import { humanPassAbi } from "@/lib/contracts/HumanPass.abi";
+
+const CONTRACT = process.env.NEXT_PUBLIC_HUMANPASS_CONTRACT_ADDRESS;
 
 export function ProtectedPage({ address }) {
-  const { isHuman, expiresAt, isLoading } = useHumanPass(address);
+  const { data: isHuman } = useReadContract({
+    address: CONTRACT,
+    abi: humanPassAbi,
+    functionName: "isHuman",
+    args: [address],
+  });
 
-  if (isLoading) return <Spinner />;
-
-  if (!isHuman) {
-    return <RedirectToVerify />;
-  }
-
-  return <YourProtectedContent expiresAt={expiresAt} />;
+  if (!isHuman) return <RedirectToVerify />;
+  return <YourProtectedContent />;
 }`;
 
 const SOLIDITY_SNIPPET = `// SPDX-License-Identifier: MIT
@@ -148,8 +163,14 @@ export default function DevelopersPage() {
         {/* Quickstart — most important */}
         <section className="mb-10">
           <h2 className="mb-3 text-xl font-bold text-text-primary">Quickstart</h2>
-          <p className="mb-4 text-sm text-text-secondary">Three lines. That&apos;s the integration.</p>
+          <p className="mb-4 text-sm text-text-secondary">
+            Gate any action with <code className="text-monad-cyan">requireHuman</code>. Never throws — returns a typed result.
+          </p>
           <CodeBlock code={SDK_QUICKSTART} />
+          <p className="mt-4 mb-2 text-sm text-text-secondary">
+            Or read the full status object:
+          </p>
+          <CodeBlock code={SDK_STATUS} />
         </section>
 
         {/* Architecture */}
@@ -200,9 +221,9 @@ export default function DevelopersPage() {
           <h2 className="text-xl font-bold text-text-primary">Code Examples</h2>
 
           <div>
-            <h3 className="mb-2 font-semibold text-text-primary">React hook</h3>
+            <h3 className="mb-2 font-semibold text-text-primary">React / wagmi — live read</h3>
             <p className="mb-3 text-sm text-text-secondary">
-              Drop <code className="text-monad-cyan">useHumanPass</code> at the top of any protected component.
+              Use <code className="text-monad-cyan">useReadContract</code> in client components for reactive proof state.
             </p>
             <CodeBlock code={REACT_HOOK} />
           </div>

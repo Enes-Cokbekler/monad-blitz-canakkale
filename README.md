@@ -278,6 +278,52 @@ See `/developers` for full Solidity, viem, and React/wagmi examples.
 
 ---
 
+## TypeScript Integration Helper
+
+`lib/humanpass-sdk.ts` provides a typed, viem-based helper that any frontend or server-side code can use to check HumanPass status.
+
+**Functions:**
+
+| Function | Returns | Use when |
+|---|---|---|
+| `requireHuman(address)` | `{ ok, reason?, status? }` | Gating a protected action — never throws |
+| `getHumanPassStatus(address)` | `HumanPassStatus` | Reading full status including expiry |
+| `isHuman(address)` | `boolean` | Simple boolean check |
+| `getHumanUntil(address)` | `number` (Unix seconds) | Displaying expiry time |
+
+**Gate a protected action (server or Node):**
+
+```typescript
+import { requireHuman } from "@/lib/humanpass-sdk";
+
+const result = await requireHuman(userAddress);
+
+if (!result.ok) {
+  // result.reason: "HUMANPASS_REQUIRED" | "PROOF_EXPIRED" | "INVALID_ADDRESS" | "CONTRACT_NOT_CONFIGURED"
+  redirect("/verify");
+}
+
+allowProtectedAction(); // result.status has full proof details
+```
+
+**Read full status:**
+
+```typescript
+import { getHumanPassStatus } from "@/lib/humanpass-sdk";
+
+const status = await getHumanPassStatus(address);
+// { address, isHuman, humanUntil, expiresInSeconds, contractAddress, chainId }
+```
+
+**How it works:**
+- Reads the deployed HumanPass contract on Monad via viem `readContract`
+- No app needs to implement challenge or signature logic — the SDK reads proof state only
+- Returns clean errors (`CONTRACT_NOT_CONFIGURED`, `INVALID_ADDRESS`) instead of crashing if env is missing
+- `requireHuman` never throws — use in API routes, server actions, and middleware safely
+- For React client components, use wagmi `useReadContract` with `humanPassAbi` directly
+
+---
+
 ## Integrating HumanPass
 
 HumanPass proofs are portable across apps. Any Monad contract can verify a wallet by calling
