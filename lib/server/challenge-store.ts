@@ -104,6 +104,7 @@ function buildSession(
 }
 
 export function createChallenge(address: string, chainId: number, forceType?: ChallengeType) {
+  cleanupExpiredChallenges();
   const key = walletKey(address);
   const previousChallengeId = challengeStore.activeChallengesByWallet.get(key);
   if (previousChallengeId) {
@@ -128,6 +129,7 @@ export function consumeChallenge(challengeId: string) {
   if (!challenge) return undefined;
 
   challenge.consumed = true;
+  challenge.consumedAt = Date.now();
   if (
     challengeStore.activeChallengesByWallet.get(walletKey(challenge.address)) ===
     challengeId
@@ -154,6 +156,33 @@ export function getActiveChallenge(address: string) {
     return undefined;
   }
   return challenge;
+}
+
+/** Grace period after which a consumed challenge is eligible for cleanup. */
+const CONSUMED_GRACE_MS = 30_000;
+
+/**
+ * Remove stale challenges from memory.
+ * - Expired challenges (now > expiresAt) are always removed.
+ * - Consumed challenges are removed after CONSUMED_GRACE_MS.
+ * Called automatically on createChallenge; export for direct test use.
+ */
+export function cleanupExpiredChallenges() {
+  const now = Date.now();
+  for (const [id, challenge] of challengeStore.challenges) {
+    const expired = now > challenge.expiresAt;
+    const consumedAndGraced =
+      challenge.consumed &&
+      challenge.consumedAt !== undefined &&
+      now > challenge.consumedAt + CONSUMED_GRACE_MS;
+
+    if (expired || consumedAndGraced) {
+      challengeStore.challenges.delete(id);
+      if (challengeStore.activeChallengesByWallet.get(walletKey(challenge.address)) === id) {
+        challengeStore.activeChallengesByWallet.delete(walletKey(challenge.address));
+      }
+    }
+  }
 }
 
 export function clearChallengesForTests() {

@@ -58,6 +58,8 @@ export type ChallengeSession = {
   maxAttempts: number;
   /** One-time use flag — true after successful verification */
   consumed: boolean;
+  /** Timestamp (ms) when the challenge was consumed. Set by consumeChallenge(). */
+  consumedAt?: number;
   address: string;
   chainId: number;
   type: ChallengeType;

@@ -17,6 +17,7 @@ const NAV_LINKS = [
   { href: "/humans", label: "Live Humans" },
   { href: "/simulator", label: "Simulator" },
   { href: "/developers", label: "Developers" },
+  { href: "/health", label: "Health" },
 ];
 
 export function Nav() {

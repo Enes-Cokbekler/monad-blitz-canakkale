@@ -3,6 +3,7 @@ import { privateKeyToAccount } from "viem/accounts";
 
 import { POST } from "@/app/api/vote/route";
 import { GET } from "@/app/api/vote/results/route";
+import { resetRateLimitForTests } from "@/lib/server/rate-limiter";
 import { clearVotesForTests } from "@/lib/server/vote-store";
 
 vi.mock("@/lib/server/vote-check", () => ({
@@ -73,10 +74,12 @@ describe("POST /api/vote", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     clearVotesForTests();
+    resetRateLimitForTests();
   });
 
   afterEach(() => {
     clearVotesForTests();
+    resetRateLimitForTests();
   });
 
   it("rejects vote from unverified wallet with NOT_HUMAN", async () => {
@@ -159,10 +162,12 @@ describe("GET /api/vote/results", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     clearVotesForTests();
+    resetRateLimitForTests();
   });
 
   afterEach(() => {
     clearVotesForTests();
+    resetRateLimitForTests();
   });
 
   it("returns correct tallies after votes", async () => {

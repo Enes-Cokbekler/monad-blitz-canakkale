@@ -7,6 +7,7 @@ import {
   getChallenge,
 } from "@/lib/server/challenge-store";
 import { FUNNY_QUESTIONS, TYPING_PHRASE } from "@/lib/server/challenge-schema";
+import { resetRateLimitForTests } from "@/lib/server/rate-limiter";
 
 const VALID_ADDRESS = "0x1234567890abcdef1234567890abcdef12345678";
 const VALID_CHAIN_ID = 10143;
@@ -28,6 +29,7 @@ async function postChallenge(body: unknown) {
 describe("POST /api/challenge/start", () => {
   afterEach(() => {
     clearChallengesForTests();
+    resetRateLimitForTests();
   });
 
   it("returns a challenge with required base fields", async () => {

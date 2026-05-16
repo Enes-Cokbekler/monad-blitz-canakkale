@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { recoverMessageAddress } from "viem";
 
+import {
+  checkRateLimit,
+  clientKey,
+  rateLimitResponse,
+} from "@/lib/server/rate-limiter";
 import { checkIsHuman } from "@/lib/server/vote-check";
 import { recordVote, type VoteOptionId } from "@/lib/server/vote-store";
 
@@ -48,6 +53,13 @@ export async function POST(request: Request) {
     !EVM_ADDRESS_PATTERN.test(body.address)
   ) {
     return NextResponse.json({ error: "INVALID_ADDRESS" }, { status: 400 });
+  }
+
+  // Rate limit by wallet + IP
+  const rlKey = body.address.toLowerCase();
+  const ipKey = clientKey(request);
+  if (!checkRateLimit(rlKey, "vote") || !checkRateLimit(ipKey, "global")) {
+    return rateLimitResponse();
   }
 
   if (typeof body.optionId !== "string") {

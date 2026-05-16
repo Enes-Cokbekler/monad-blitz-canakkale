@@ -21,6 +21,7 @@ import {
   incrementAttempts,
 } from "@/lib/server/challenge-store";
 import { clearProofsForTests, getProof } from "@/lib/server/proof-cache";
+import { resetRateLimitForTests } from "@/lib/server/rate-limiter";
 import { getHumanPassContract } from "@/lib/server/verifier-client";
 
 vi.mock("@/lib/server/verifier-client", () => ({
@@ -125,6 +126,7 @@ describe("POST /api/challenge/verify", () => {
     vi.resetAllMocks();
     clearChallengesForTests();
     clearProofsForTests();
+    resetRateLimitForTests();
     mockConfiguredVerifier();
     process.env.NEXT_PUBLIC_HUMANPASS_CONTRACT_ADDRESS = CONTRACT_ADDRESS;
   });

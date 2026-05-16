@@ -22,6 +22,11 @@ import {
   incrementAttempts,
 } from "@/lib/server/challenge-store";
 import { cacheProof } from "@/lib/server/proof-cache";
+import {
+  checkRateLimit,
+  clientKey,
+  rateLimitResponse,
+} from "@/lib/server/rate-limiter";
 import { getHumanPassContract } from "@/lib/server/verifier-client";
 
 const PROOF_DURATION_SECONDS = 600n;
@@ -152,6 +157,13 @@ export async function POST(request: NextRequest) {
     body.address.toLowerCase() !== challenge.address.toLowerCase()
   ) {
     return NextResponse.json({ error: "INVALID_ADDRESS" }, { status: 400 });
+  }
+
+  // Rate limit by wallet + IP
+  const rlKey = body.address.toLowerCase();
+  const ipKey = clientKey(request);
+  if (!checkRateLimit(rlKey, "challenge_verify") || !checkRateLimit(ipKey, "global")) {
+    return rateLimitResponse();
   }
 
   // Explicit nonce check — defense-in-depth on top of signature binding

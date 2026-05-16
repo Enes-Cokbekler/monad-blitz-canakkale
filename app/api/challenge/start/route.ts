@@ -5,6 +5,11 @@ import {
   MONAD_TESTNET_CHAIN_ID,
 } from "@/lib/server/challenge-schema";
 import { createChallenge } from "@/lib/server/challenge-store";
+import {
+  checkRateLimit,
+  clientKey,
+  rateLimitResponse,
+} from "@/lib/server/rate-limiter";
 
 const EVM_ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 
@@ -28,6 +33,13 @@ export async function POST(request: Request) {
 
   if (body.chainId !== MONAD_TESTNET_CHAIN_ID) {
     return NextResponse.json({ error: "WRONG_CHAIN" }, { status: 400 });
+  }
+
+  // Rate limit by wallet; fallback to IP
+  const rlKey = body.address.toLowerCase();
+  const ipKey = clientKey(request);
+  if (!checkRateLimit(rlKey, "challenge_start") || !checkRateLimit(ipKey, "global")) {
+    return rateLimitResponse();
   }
 
   const challenge = createChallenge(body.address, body.chainId);

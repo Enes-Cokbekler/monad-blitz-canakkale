@@ -227,6 +227,19 @@ This is for presentations only. Do not enable in production.
 
 ---
 
+## Operational Safety
+
+| Mechanism | What it does |
+|---|---|
+| **In-memory rate limiting** | Per-wallet and per-IP sliding-window counters gate `/api/challenge/start`, `/api/challenge/verify`, and `/api/vote`. Limits: 5 challenge starts / wallet / min, 10 verify attempts / wallet / min, 5 votes / wallet / min, 30 global requests / IP / min. |
+| **Challenge cleanup** | Expired challenges are purged on each `createChallenge` call. Consumed challenges are removed after a 30-second grace period to allow in-flight response reads. No Redis required. |
+| **Health endpoint** | `GET /api/health` returns RPC status, chain ID, HumanPass contract read result, verifier wallet address, MON balance, and whether the verifier has enough gas. Never exposes private keys. |
+| **Health dashboard** | `/health` shows a live operational view — useful before demos and after deployment. |
+
+**Production note:** The in-memory rate limiter and challenge store are single-process. For multi-instance or serverless deployments, replace with Redis.
+
+---
+
 ## Known MVP Limits
 
 - **Single-process in-memory challenge state** — Not safe for serverless deployments where each request may hit a different instance. For production, replace with Redis.
