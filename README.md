@@ -278,6 +278,48 @@ See `/developers` for full Solidity, viem, and React/wagmi examples.
 
 ---
 
+## On-chain Proof Activity
+
+HumanPass emits `HumanProofIssued` and `HumanProofRevoked` events for every proof issuance and revocation. These events are the authoritative on-chain audit trail.
+
+**What this means:**
+- Any app or user can independently read proof history from the Monad contract logs — no trust in the HumanPass frontend required
+- The `/activity` page reads recent contract logs and displays them with block numbers and transaction hashes
+- Event-based auditability makes the proof layer composable: dashboards, wallets, and other protocols can index HumanPass events independently
+
+**Configure for efficient log reads:**
+
+After deploying, set the deploy block in `.env.local` to avoid scanning from genesis:
+
+```env
+NEXT_PUBLIC_HUMANPASS_DEPLOY_BLOCK=<block number printed by deploy script>
+```
+
+Without this, the app falls back to scanning the last 50,000 blocks. The deploy script prints `deploymentBlock` so you can copy it directly.
+
+**Events emitted by the contract:**
+
+```solidity
+event HumanProofIssued(address indexed user, uint256 validUntil);
+event HumanProofRevoked(address indexed user);
+event VerifierUpdated(address indexed oldVerifier, address indexed newVerifier);
+```
+
+**Read events via the TypeScript helper:**
+
+```typescript
+import { getRecentHumanPassEvents, getHumanProofEventsForAddress } from "@/lib/humanpass-events";
+
+// All recent events
+const { events } = await getRecentHumanPassEvents();
+
+// Events for a specific wallet
+const { events } = await getHumanProofEventsForAddress(address);
+// [{ type: "ISSUED", user, validUntil, txHash, blockNumber }, ...]
+```
+
+---
+
 ## TypeScript Integration Helper
 
 `lib/humanpass-sdk.ts` provides a typed, viem-based helper that any frontend or server-side code can use to check HumanPass status.

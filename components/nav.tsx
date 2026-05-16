@@ -13,6 +13,7 @@ const NAV_LINKS = [
   { href: "/verify", label: "Verify" },
   { href: "/vote", label: "Vote" },
   { href: "/status", label: "Status" },
+  { href: "/activity", label: "Activity" },
   { href: "/humans", label: "Live Humans" },
   { href: "/simulator", label: "Simulator" },
   { href: "/developers", label: "Developers" },

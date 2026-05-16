@@ -17,6 +17,17 @@ type ProofStatusResponse = {
   error?: string;
 };
 
+type WalletEvent = {
+  type: "ISSUED" | "REVOKED";
+  txHash: string;
+  blockNumber: string;
+  validUntil?: number;
+};
+
+type ActivityResponse = {
+  events: WalletEvent[];
+};
+
 const EXPLORER_URL = "https://testnet.monadexplorer.com";
 
 function formatCountdown(seconds: number) {
@@ -40,6 +51,7 @@ export default function StatusPage() {
   const [status, setStatus] = useState<ProofStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [walletEvents, setWalletEvents] = useState<WalletEvent[]>([]);
 
   useEffect(() => {
     if (address && !lookupAddress) {
@@ -55,18 +67,25 @@ export default function StatusPage() {
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/proof/status?address=${encodeURIComponent(trimmedAddress)}`
-      );
-      const data = (await response.json()) as ProofStatusResponse;
+      const [statusRes, eventsRes] = await Promise.all([
+        fetch(`/api/proof/status?address=${encodeURIComponent(trimmedAddress)}`),
+        fetch(`/api/activity?address=${encodeURIComponent(trimmedAddress)}`),
+      ]);
 
-      if (!response.ok) {
+      const data = (await statusRes.json()) as ProofStatusResponse;
+
+      if (!statusRes.ok) {
         setStatus(null);
         setError(data.error ?? "STATUS_LOOKUP_FAILED");
         return;
       }
 
       setStatus(data);
+
+      if (eventsRes.ok) {
+        const eventsData = (await eventsRes.json()) as ActivityResponse;
+        setWalletEvents(eventsData.events ?? []);
+      }
     } catch (err) {
       setStatus(null);
       setError(err instanceof Error ? err.message : "STATUS_LOOKUP_FAILED");
@@ -201,6 +220,46 @@ export default function StatusPage() {
                 View proof transaction →
               </a>
             )}
+          </section>
+        )}
+
+        {walletEvents.length > 0 && (
+          <section className="mt-6">
+            <h2 className="mb-3 text-sm font-semibold text-text-primary">Recent On-Chain Activity</h2>
+            <div className="space-y-2">
+              {walletEvents.map((event) => (
+                <div
+                  key={`${event.txHash}-${event.blockNumber}`}
+                  className="flex items-center justify-between rounded-lg border border-surface-border bg-surface-secondary px-4 py-3 text-sm"
+                >
+                  <div className="flex items-center gap-3">
+                    {event.type === "ISSUED" ? (
+                      <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-400">
+                        Issued
+                      </span>
+                    ) : (
+                      <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-400">
+                        Revoked
+                      </span>
+                    )}
+                    <span className="text-xs text-text-muted">Block {event.blockNumber}</span>
+                  </div>
+                  <a
+                    href={`${EXPLORER_URL}/tx/${event.txHash}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono text-xs text-monad-cyan hover:text-monad-purple-light"
+                  >
+                    {event.txHash.slice(0, 10)}…{event.txHash.slice(-6)}
+                  </a>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-right text-xs text-text-muted">
+              <Link href="/activity" className="text-monad-cyan hover:text-monad-purple-light">
+                View all activity →
+              </Link>
+            </p>
           </section>
         )}
       </div>

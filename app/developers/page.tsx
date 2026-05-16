@@ -247,6 +247,38 @@ export default function DevelopersPage() {
           </div>
         </section>
 
+        {/* Event-based auditability */}
+        <section className="mb-10 rounded-xl border border-monad-cyan/20 bg-monad-cyan/5 p-6">
+          <h2 className="mb-3 text-xl font-bold text-text-primary">Event-based auditability</h2>
+          <p className="mb-4 text-sm text-text-secondary">
+            Every proof issuance and revocation emits an on-chain event. Apps can check{" "}
+            <code className="text-monad-cyan">isHuman(address)</code> for current state, or read{" "}
+            <code className="text-monad-cyan">HumanProofIssued</code> event logs for full history.
+            The proof layer is transparent and composable — no trust in any frontend required.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              {
+                label: "Current state",
+                body: "isHuman(address) → bool. One read, any contract, any frontend. No backend call to HumanPass.",
+              },
+              {
+                label: "Historical audit",
+                body: "Read HumanProofIssued/HumanProofRevoked events from the contract logs to build dashboards or prove past verification.",
+              },
+              {
+                label: "Composability",
+                body: "Events make the proof layer open: wallets, explorers, and other protocols can index and display proof history independently.",
+              },
+            ].map((item) => (
+              <div key={item.label} className="rounded-lg border border-surface-border bg-surface-secondary p-4">
+                <p className="mb-1 text-xs font-semibold text-monad-cyan">{item.label}</p>
+                <p className="text-xs text-text-secondary">{item.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Use cases */}
         <section className="mb-10 rounded-xl border border-monad-purple/30 bg-monad-purple/10 p-6">
           <h2 className="mb-3 font-bold text-monad-purple-light">One Layer, Any App</h2>

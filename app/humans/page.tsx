@@ -79,7 +79,10 @@ export default function HumansPage() {
           <div>
             <h1 className="text-3xl font-bold text-text-primary">Live Verified Humans</h1>
             <p className="mt-1 text-text-secondary">
-              Recently verified wallets cached by this HumanPass demo session.
+              Recently verified wallets from this session&apos;s in-memory cache.{" "}
+              <a href="/activity" className="text-monad-cyan hover:text-monad-purple-light">
+                View on-chain event history →
+              </a>
             </p>
           </div>
           <WalletConnect />

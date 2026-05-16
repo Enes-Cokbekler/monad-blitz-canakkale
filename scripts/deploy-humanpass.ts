@@ -12,6 +12,7 @@ type DeploymentOutput = {
   verifier: string;
   maxDuration: number;
   txHash: string | null;
+  deploymentBlock: number | null;
 };
 
 function isDryRun() {
@@ -43,9 +44,13 @@ function getChainId(preferMonadFallback = false) {
 async function deployHumanPass(verifier: string): Promise<DeploymentOutput> {
   const HumanPass = await ethers.getContractFactory("HumanPass");
   const humanPass = await HumanPass.deploy(verifier, MAX_DURATION);
-  const txHash = humanPass.deploymentTransaction()?.hash ?? null;
+  const deployTx = humanPass.deploymentTransaction();
+  const txHash = deployTx?.hash ?? null;
 
   await humanPass.waitForDeployment();
+
+  const receipt = deployTx ? await deployTx.wait() : null;
+  const deploymentBlock = receipt?.blockNumber ?? null;
 
   return {
     chainId: getChainId(),
@@ -53,6 +58,7 @@ async function deployHumanPass(verifier: string): Promise<DeploymentOutput> {
     verifier,
     maxDuration: MAX_DURATION,
     txHash,
+    deploymentBlock,
   };
 }
 
@@ -68,6 +74,7 @@ async function main() {
       verifier,
       maxDuration: MAX_DURATION,
       txHash: null,
+      deploymentBlock: null,
     };
 
     console.log(JSON.stringify(output, null, 2));
