@@ -1,0 +1,13 @@
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - heading "HumanPass Verification" [level=1] [ref=e7]
+        - paragraph [ref=e8]: Prove you are human by completing a short challenge.
+      - generic [ref=e9]:
+        - generic:
+          - button: Connect Wallet
+    - generic [ref=e10]:
+      - generic [ref=e11]: 🔒
+      - heading "Connect Your Wallet" [level=2] [ref=e12]
+      - paragraph [ref=e13]: You need to connect a Monad Testnet wallet to start the verification challenge.

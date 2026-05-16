@@ -1,0 +1,59 @@
+[   16069ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:25630
+[   17403ms] [WARNING] ./node_modules/@metamask/sdk/dist/browser/es/metamask-sdk.js
+Module not found: Can't resolve '@react-native-async-storage/async-storage' in '/Users/hdteknoloji/Desktop/Software/hackathons/monad-canakkale/node_modules/@metamask/sdk/dist/browser/es' @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/hot-reloader-app.js:241
+[   17414ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/favicon.ico:0
+[   48546ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/hot-reloader-app.js:196
+[   50616ms] [WARNING] ./node_modules/@metamask/sdk/dist/browser/es/metamask-sdk.js
+Module not found: Can't resolve '@react-native-async-storage/async-storage' in '/Users/hdteknoloji/Desktop/Software/hackathons/monad-canakkale/node_modules/@metamask/sdk/dist/browser/es'
+
+Import trace for requested module:
+./node_modules/@metamask/sdk/dist/browser/es/metamask-sdk.js
+./node_modules/@wagmi/connectors/dist/esm/metaMask.js
+./node_modules/@wagmi/connectors/dist/esm/exports/index.js
+./node_modules/wagmi/dist/esm/exports/connectors.js
+./node_modules/@rainbow-me/rainbowkit/dist/index.js
+./app/providers.tsx @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/hot-reloader-app.js:241
+[   50617ms] [WARNING] ./components/wallet-connect.tsx
+Attempted import error: 'monadTestnet' is not exported from '@/lib/wagmi/config' (imported as 'monadTestnet').
+
+Import trace for requested module:
+./components/wallet-connect.tsx @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/hot-reloader-app.js:241
+[   50617ms] [WARNING] ./components/wallet-connect.tsx
+Attempted import error: 'monadTestnet' is not exported from '@/lib/wagmi/config' (imported as 'monadTestnet').
+
+Import trace for requested module:
+./components/wallet-connect.tsx @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/hot-reloader-app.js:241
+[   50617ms] [WARNING] ./components/wallet-connect.tsx
+Attempted import error: 'monadTestnet' is not exported from '@/lib/wagmi/config' (imported as 'monadTestnet').
+
+Import trace for requested module:
+./components/wallet-connect.tsx @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/hot-reloader-app.js:241
+[   50649ms] [LOG] [Fast Refresh] done in 2102ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/report-hmr-latency.js:13
+[   93565ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/hot-reloader-app.js:196
+[   94678ms] [WARNING] ./node_modules/@metamask/sdk/dist/browser/es/metamask-sdk.js
+Module not found: Can't resolve '@react-native-async-storage/async-storage' in '/Users/hdteknoloji/Desktop/Software/hackathons/monad-canakkale/node_modules/@metamask/sdk/dist/browser/es'
+
+Import trace for requested module:
+./node_modules/@metamask/sdk/dist/browser/es/metamask-sdk.js
+./node_modules/@wagmi/connectors/dist/esm/metaMask.js
+./node_modules/@wagmi/connectors/dist/esm/exports/index.js
+./node_modules/wagmi/dist/esm/exports/connectors.js
+./node_modules/@rainbow-me/rainbowkit/dist/index.js
+./app/providers.tsx @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/hot-reloader-app.js:241
+[   94717ms] [LOG] [Fast Refresh] done in 1151ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/report-hmr-latency.js:13
+[   95115ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/hot-reloader-app.js:196
+[   96060ms] [WARNING] ./node_modules/@metamask/sdk/dist/browser/es/metamask-sdk.js
+Module not found: Can't resolve '@react-native-async-storage/async-storage' in '/Users/hdteknoloji/Desktop/Software/hackathons/monad-canakkale/node_modules/@metamask/sdk/dist/browser/es'
+
+Import trace for requested module:
+./node_modules/@metamask/sdk/dist/browser/es/metamask-sdk.js
+./node_modules/@wagmi/connectors/dist/esm/metaMask.js
+./node_modules/@wagmi/connectors/dist/esm/exports/index.js
+./node_modules/wagmi/dist/esm/exports/connectors.js
+./node_modules/@rainbow-me/rainbowkit/dist/index.js
+./app/providers.tsx @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/hot-reloader-app.js:241
+[   96087ms] [LOG] [Fast Refresh] done in 971ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/report-hmr-latency.js:13
+[   99141ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/?_rsc=_mjR7ylJSLpkZcZ3:0
+[   99992ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/?_rsc=_mjR7ylJSLpkZcZ3:0
+[  100818ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/?_rsc=_mjR7ylJSLpkZcZ3:0
+[  101635ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/:0

@@ -1,0 +1,188 @@
+import { NextRequest, NextResponse } from "next/server";
+import {
+  createPublicClient,
+  http,
+  recoverMessageAddress,
+  type Abi,
+  type Address,
+  type Hash,
+} from "viem";
+import { waitForTransactionReceipt } from "viem/actions";
+
+import { monadTestnet } from "@/lib/chains/monad";
+import { buildChallengeMessage } from "@/lib/server/challenge-schema";
+import {
+  consumeChallenge,
+  getChallenge,
+  incrementAttempts,
+} from "@/lib/server/challenge-store";
+import { cacheProof } from "@/lib/server/proof-cache";
+import { getHumanPassContract } from "@/lib/server/verifier-client";
+
+const PROOF_DURATION_SECONDS = 600n;
+const PROOF_DURATION_MS = 600_000;
+
+type VerifyChallengeRequest = {
+  challengeId?: unknown;
+  address?: unknown;
+  chainId?: unknown;
+  signature?: unknown;
+  clickedNumbers?: unknown;
+};
+
+type HumanPassContract = {
+  abi: Abi;
+  address: Address;
+  walletClient: {
+    writeContract: (parameters: {
+      abi: Abi;
+      address: Address;
+      functionName: "issueHumanProof";
+      args: readonly [string, bigint];
+    }) => Promise<Hash>;
+  };
+};
+
+const publicClient = createPublicClient({
+  chain: monadTestnet,
+  transport: http(monadTestnet.rpcUrls.default.http[0]),
+});
+
+function sequencesMatch(expected: number[], actual: unknown) {
+  return (
+    Array.isArray(actual) &&
+    actual.length === expected.length &&
+    actual.every((number, index) => number === expected[index])
+  );
+}
+
+function isVerifierConfigurationError(error: unknown) {
+  return (
+    error instanceof Error &&
+    (error.message.includes("VERIFIER_PRIVATE_KEY") ||
+      error.message.includes("NEXT_PUBLIC_HUMANPASS_CONTRACT_ADDRESS"))
+  );
+}
+
+function isVerifierInsufficientFundsError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.toLowerCase().includes("insufficient funds")
+  );
+}
+
+export async function POST(request: NextRequest) {
+  let body: VerifyChallengeRequest;
+
+  try {
+    body = (await request.json()) as VerifyChallengeRequest;
+  } catch {
+    return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
+  }
+
+  if (typeof body.challengeId !== "string") {
+    return NextResponse.json({ error: "CHALLENGE_NOT_FOUND" }, { status: 400 });
+  }
+
+  const challenge = getChallenge(body.challengeId);
+
+  if (!challenge) {
+    return NextResponse.json({ error: "CHALLENGE_NOT_FOUND" }, { status: 400 });
+  }
+
+  if (Date.now() > challenge.expiresAt) {
+    return NextResponse.json({ error: "CHALLENGE_EXPIRED" }, { status: 400 });
+  }
+
+  if (challenge.consumed) {
+    return NextResponse.json({ error: "CHALLENGE_CONSUMED" }, { status: 400 });
+  }
+
+  if (body.chainId !== challenge.chainId) {
+    return NextResponse.json({ error: "WRONG_CHAIN" }, { status: 400 });
+  }
+
+  if (
+    typeof body.address !== "string" ||
+    body.address.toLowerCase() !== challenge.address.toLowerCase()
+  ) {
+    return NextResponse.json({ error: "INVALID_ADDRESS" }, { status: 400 });
+  }
+
+  if (challenge.attempts >= 3) {
+    return NextResponse.json({ error: "MAX_ATTEMPTS" }, { status: 400 });
+  }
+
+  incrementAttempts(challenge.challengeId);
+
+  if (!sequencesMatch(challenge.numbers, body.clickedNumbers)) {
+    return NextResponse.json({ error: "WRONG_SEQUENCE" }, { status: 400 });
+  }
+
+  if (typeof body.signature !== "string") {
+    return NextResponse.json({ error: "INVALID_SIGNATURE" }, { status: 400 });
+  }
+
+  let recovered: string;
+
+  try {
+    recovered = await recoverMessageAddress({
+      message: buildChallengeMessage(challenge),
+      signature: body.signature as `0x${string}`,
+    });
+  } catch {
+    return NextResponse.json({ error: "INVALID_SIGNATURE" }, { status: 400 });
+  }
+
+  if (recovered.toLowerCase() !== body.address.toLowerCase()) {
+    return NextResponse.json({ error: "INVALID_SIGNATURE" }, { status: 400 });
+  }
+
+  let contract: HumanPassContract;
+
+  try {
+    contract = getHumanPassContract() as unknown as HumanPassContract;
+  } catch (error) {
+    if (isVerifierConfigurationError(error)) {
+      return NextResponse.json(
+        { error: "VERIFIER_NOT_CONFIGURED" },
+        { status: 500 }
+      );
+    }
+
+    throw error;
+  }
+
+  let txHash: Hash;
+  let receipt: { transactionHash: Hash };
+
+  try {
+    txHash = await contract.walletClient.writeContract({
+      abi: contract.abi,
+      address: contract.address,
+      functionName: "issueHumanProof",
+      args: [body.address, PROOF_DURATION_SECONDS],
+    });
+    receipt = await waitForTransactionReceipt(publicClient, { hash: txHash });
+  } catch (error) {
+    if (isVerifierInsufficientFundsError(error)) {
+      return NextResponse.json(
+        { error: "VERIFIER_INSUFFICIENT_FUNDS" },
+        { status: 503 }
+      );
+    }
+
+    throw error;
+  }
+  const validUntil = Date.now() + PROOF_DURATION_MS;
+
+  consumeChallenge(challenge.challengeId);
+  cacheProof(body.address, validUntil, receipt.transactionHash);
+
+  return NextResponse.json({
+    status: "verified",
+    txHash: receipt.transactionHash,
+    validUntil,
+    contractAddress: contract.address,
+  });
+}

@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #0a0a12;
+  --bg-secondary: #12121f;
+  --bg-card: #161628;
+  --text-primary: #e8e8f0;
+  --text-secondary: #9898b0;
+  --text-muted: #6b6b85;
+  --border-default: #2a2a45;
+  --border-light: #3a3a5c;
+  --accent-purple: #8b5cf6;
+  --accent-cyan: #22d3ee;
+  --accent-pink: #ec4899;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* RainbowKit overrides for dark futuristic theme */
+[data-rk] {
+  --rk-colors-accentColor: var(--accent-purple) !important;
+}
+
+@layer components {
+  .card-base {
+    @apply rounded-xl border border-surface-border bg-surface-card p-6 shadow-card transition-colors hover:border-surface-border-light;
+  }
+
+  .glow-text {
+    @apply bg-gradient-to-r from-monad-purple via-monad-cyan to-monad-pink bg-clip-text text-transparent;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-lg bg-monad-purple px-4 py-2.5 text-sm font-semibold text-white shadow-glow transition-all hover:bg-monad-purple-dark hover:shadow-glow focus:outline-none focus:ring-2 focus:ring-monad-purple focus:ring-offset-2 focus:ring-offset-surface-primary disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-lg border border-surface-border bg-surface-secondary px-4 py-2.5 text-sm font-semibold text-text-primary transition-colors hover:border-surface-border-light hover:bg-surface-card focus:outline-none focus:ring-2 focus:ring-monad-purple focus:ring-offset-2 focus:ring-offset-surface-primary disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+}

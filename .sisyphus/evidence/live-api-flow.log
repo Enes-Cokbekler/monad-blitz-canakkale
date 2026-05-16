@@ -1,0 +1,21 @@
+
+> humanpass-monad-mvp@0.1.0 dev
+> next dev -p 3105
+
+   ▲ Next.js 15.5.18
+   - Local:        http://localhost:3105
+   - Network:      http://192.168.207.14:3105
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 2.3s
+ ○ Compiling / ...
+ ✓ Compiled / in 10.6s (11425 modules)
+ GET / 200 in 11443ms
+ ○ Compiling /api/challenge/start ...
+ ✓ Compiled /api/challenge/start in 3.4s (11447 modules)
+ POST /api/challenge/start 200 in 3622ms
+ ○ Compiling /api/challenge/verify ...
+ ✓ Compiled /api/challenge/verify in 1544ms (11481 modules)
+ POST /api/challenge/verify 400 in 1901ms
+[?25h

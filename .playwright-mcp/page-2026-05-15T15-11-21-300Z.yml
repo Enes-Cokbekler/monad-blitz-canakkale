@@ -1,0 +1,86 @@
+- generic [active] [ref=e1]:
+  - main [ref=e3]:
+    - generic [ref=e6]:
+      - paragraph [ref=e7]: HumanPass on Monad
+      - heading "HumanPass is a proof-of-human session layer for consumer apps on Monad." [level=1] [ref=e8]
+      - paragraph [ref=e9]: Verify that real users — not bots — are taking sensitive actions. Lightweight, temporary, and privacy-first.
+      - generic [ref=e10]:
+        - button "Connect Wallet" [ref=e13] [cursor=pointer]
+        - link "Get your HumanPass" [ref=e14] [cursor=pointer]:
+          - /url: /verify
+    - generic [ref=e16]:
+      - heading "Consumer apps are drowning in bots" [level=2] [ref=e17]
+      - paragraph [ref=e18]: AI agents, fake accounts, and automated scripts flood games, voting systems, reward programs, and social platforms. They distort leaderboards, manipulate governance, and drain resources meant for real people. Existing solutions force users into invasive checks or permanent identity records.
+    - generic [ref=e19]:
+      - heading "How it works" [level=2] [ref=e20]
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - generic [ref=e23]: "01"
+          - heading "Connect Wallet" [level=3] [ref=e24]
+          - paragraph [ref=e25]: Link your Monad wallet to start the verification flow.
+        - generic [ref=e26]:
+          - generic [ref=e27]: "02"
+          - heading "Complete Challenge" [level=3] [ref=e28]
+          - paragraph [ref=e29]: Solve a short interactive challenge that confirms you're a real person.
+        - generic [ref=e30]:
+          - generic [ref=e31]: "03"
+          - heading "Proof Issued" [level=3] [ref=e32]
+          - paragraph [ref=e33]: An on-chain proof is recorded on Monad, timestamped with an expiry window.
+        - generic [ref=e34]:
+          - generic [ref=e35]: "04"
+          - heading "Protected App Checks Proof" [level=3] [ref=e36]
+          - paragraph [ref=e37]: Any integrated app verifies your proof before granting access to sensitive actions.
+    - generic [ref=e38]:
+      - heading "Built for consumer apps" [level=2] [ref=e39]
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]: 🎮
+          - generic [ref=e43]: Games
+        - generic [ref=e44]:
+          - generic [ref=e45]: 🗳️
+          - generic [ref=e46]: Voting
+        - generic [ref=e47]:
+          - generic [ref=e48]: 🎁
+          - generic [ref=e49]: Rewards
+        - generic [ref=e50]:
+          - generic [ref=e51]: 💬
+          - generic [ref=e52]: Social Platforms
+        - generic [ref=e53]:
+          - generic [ref=e54]: 🎪
+          - generic [ref=e55]: Events
+        - generic [ref=e56]:
+          - generic [ref=e57]: 🪂
+          - generic [ref=e58]: Airdrops
+    - generic [ref=e60]:
+      - generic [ref=e61]: Privacy-first
+      - heading "Lightweight temporary human session proof" [level=2] [ref=e62]
+      - paragraph [ref=e63]: No biometrics. No permanent identity. HumanPass issues short-lived on-chain proofs that expire after a set window — no persistent tracking, no personal data stored on-chain.
+    - generic [ref=e64]:
+      - heading "Try it now" [level=2] [ref=e65]
+      - generic [ref=e66]:
+        - link "Get your HumanPass Complete a challenge and receive your on-chain proof. Start verification →" [ref=e67] [cursor=pointer]:
+          - /url: /verify
+          - generic [ref=e68]: 🛡️
+          - heading "Get your HumanPass" [level=3] [ref=e69]
+          - paragraph [ref=e70]: Complete a challenge and receive your on-chain proof.
+          - generic [ref=e71]: Start verification →
+        - link "Try protected voting Cast a vote in a demo governance poll gated by HumanPass. Go to voting →" [ref=e72] [cursor=pointer]:
+          - /url: /vote
+          - generic [ref=e73]: 🗳️
+          - heading "Try protected voting" [level=3] [ref=e74]
+          - paragraph [ref=e75]: Cast a vote in a demo governance poll gated by HumanPass.
+          - generic [ref=e76]: Go to voting →
+        - link "Check proof status Look up any wallet's HumanPass verification state. Check status →" [ref=e77] [cursor=pointer]:
+          - /url: /status
+          - generic [ref=e78]: 🔍
+          - heading "Check proof status" [level=3] [ref=e79]
+          - paragraph [ref=e80]: Look up any wallet's HumanPass verification state.
+          - generic [ref=e81]: Check status →
+    - generic [ref=e83]:
+      - heading "Integrate HumanPass into your app" [level=2] [ref=e84]
+      - paragraph [ref=e85]: Any consumer app on Monad can check HumanPass proofs before allowing sensitive actions — voting, claiming rewards, joining events, and more. A single on-chain read tells your smart contract whether an address holds a valid proof.
+      - generic [ref=e86]:
+        - generic [ref=e87]: 📖
+        - text: Integration docs coming soon
+    - generic [ref=e88]: HumanPass — Proof-of-human session layer for consumer apps on Monad
+  - alert [ref=e89]
