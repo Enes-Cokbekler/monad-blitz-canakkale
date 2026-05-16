@@ -275,3 +275,54 @@ allowProtectedAction();
 ```
 
 See `/developers` for full Solidity, viem, and React/wagmi examples.
+
+---
+
+## Integrating HumanPass
+
+HumanPass proofs are portable across apps. Any Monad contract can verify a wallet by calling
+`isHuman(address)` on the deployed HumanPass contract — no knowledge of challenges or signatures needed.
+
+**How it works for consumer apps:**
+
+- User verifies once on HumanPass and receives an on-chain proof tied to their wallet.
+- Consumer apps import `IHumanPass` and pass the HumanPass contract address in their constructor.
+- They call `humanPass.isHuman(msg.sender)` to gate any sensitive action.
+- Proof expiry and revocation are handled entirely by HumanPass — consumer apps read state only.
+- This makes HumanPass a reusable verification layer: deploy once, read from anywhere on Monad.
+
+**Interface:**
+
+```solidity
+interface IHumanPass {
+    function isHuman(address user) external view returns (bool);
+    function getHumanUntil(address user) external view returns (uint256);
+}
+```
+
+**Minimal consumer contract:**
+
+```solidity
+contract MyApp {
+    IHumanPass public humanPass;
+
+    constructor(address humanPassAddress) {
+        humanPass = IHumanPass(humanPassAddress);
+    }
+
+    function protectedAction() external {
+        require(humanPass.isHuman(msg.sender), "HumanPass required");
+        // action
+    }
+}
+```
+
+See `contracts/interfaces/IHumanPass.sol` for the full interface and
+`contracts/examples/HumanProtectedAction.sol` for a complete integration example.
+
+**Run contract tests:**
+
+```bash
+npm run test:contracts          # All Hardhat tests (HumanPass + HumanProtectedAction)
+npm run compile:contracts       # Recompile contracts
+```

@@ -29,18 +29,23 @@ export function ProtectedPage({ address }) {
 }`;
 
 const SOLIDITY_SNIPPET = `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.28;
 
+// Minimal interface — copy this or import IHumanPass.sol from the repo
 interface IHumanPass {
-    function isHuman(address wallet) external view returns (bool);
+    function isHuman(address user) external view returns (bool);
+    function getHumanUntil(address user) external view returns (uint256);
 }
 
-contract MyProtectedApp {
-    IHumanPass public humanPass =
-        IHumanPass(${CONTRACT_ADDRESS});
+contract MyApp {
+    IHumanPass public humanPass;
+
+    constructor(address humanPassAddress) {
+        humanPass = IHumanPass(humanPassAddress);
+    }
 
     modifier onlyHuman() {
-        require(humanPass.isHuman(msg.sender), "No HumanPass");
+        require(humanPass.isHuman(msg.sender), "HumanPass required");
         _;
     }
 
@@ -131,11 +136,12 @@ export default function DevelopersPage() {
           <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-monad-cyan/30 bg-monad-cyan/10 px-3 py-1 text-xs font-semibold text-monad-cyan">
             DEVELOPER DOCS
           </div>
-          <h1 className="text-3xl font-bold text-text-primary">Integrate HumanPass</h1>
+          <h1 className="text-3xl font-bold text-text-primary">Integrate HumanPass in any Monad app</h1>
           <p className="mt-2 max-w-2xl text-text-secondary">
             HumanPass is a reusable proof-of-human session layer. Any consumer app on Monad can gate
             sensitive actions behind a HumanPass check — one function call, any contract, any frontend.
-            Users verify once. Every integrated app benefits.
+            Users verify once. Every integrated app benefits. Consumer apps never interact with
+            challenges or signatures — they only read the on-chain proof state.
           </p>
         </div>
 
@@ -202,9 +208,11 @@ export default function DevelopersPage() {
           </div>
 
           <div>
-            <h3 className="mb-2 font-semibold text-text-primary">Solidity — onlyHuman modifier</h3>
+            <h3 className="mb-2 font-semibold text-text-primary">Solidity — integrate via IHumanPass</h3>
             <p className="mb-3 text-sm text-text-secondary">
-              Add to any function you want to protect. Bots calling it directly revert immediately.
+              Copy the interface or import{" "}
+              <code className="text-monad-cyan">IHumanPass.sol</code> from the repo. Pass the deployed
+              HumanPass address in your constructor. Bots calling your functions revert immediately.
             </p>
             <CodeBlock code={SOLIDITY_SNIPPET} />
           </div>
