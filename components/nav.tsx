@@ -9,8 +9,9 @@ import { WalletConnect } from "@/components/wallet-connect";
 
 const NAV_LINKS = [
   { href: "/", label: "HumanPass" },
+  { href: "/demo", label: "Demo" },
   { href: "/verify", label: "Verify" },
-  { href: "/vote", label: "Vote Demo" },
+  { href: "/vote", label: "Vote" },
   { href: "/status", label: "Status" },
   { href: "/humans", label: "Live Humans" },
   { href: "/simulator", label: "Simulator" },

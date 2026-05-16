@@ -86,7 +86,7 @@ async function createSignedBody(
 
   return {
     challenge,
-    body: { challengeId: challenge.challengeId, address, chainId, signature, ...answerFields },
+    body: { challengeId: challenge.challengeId, address, chainId, nonce: challenge.nonce, signature, ...answerFields },
   };
 }
 
@@ -109,6 +109,7 @@ describe("POST /api/challenge/verify", () => {
       challengeId: challenge.challengeId,
       address: VALID_ADDRESS,
       chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
       signature,
       clickedNumbers: challenge.numbers,
     });
@@ -146,6 +147,7 @@ describe("POST /api/challenge/verify", () => {
       challengeId: challenge.challengeId,
       address: VALID_ADDRESS,
       chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
       signature,
       clickedAt,
     });
@@ -163,6 +165,7 @@ describe("POST /api/challenge/verify", () => {
       challengeId: challenge.challengeId,
       address: VALID_ADDRESS,
       chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
       signature,
       clickedAt,
     });
@@ -180,6 +183,7 @@ describe("POST /api/challenge/verify", () => {
       challengeId: challenge.challengeId,
       address: VALID_ADDRESS,
       chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
       signature,
       clickedAt,
     });
@@ -198,6 +202,7 @@ describe("POST /api/challenge/verify", () => {
       challengeId: challenge.challengeId,
       address: VALID_ADDRESS,
       chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
       signature,
       typedPhrase: TYPING_PHRASE,
     });
@@ -214,6 +219,7 @@ describe("POST /api/challenge/verify", () => {
       challengeId: challenge.challengeId,
       address: VALID_ADDRESS,
       chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
       signature,
       typedPhrase: "wrong phrase here",
     });
@@ -230,6 +236,7 @@ describe("POST /api/challenge/verify", () => {
       challengeId: challenge.challengeId,
       address: VALID_ADDRESS,
       chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
       signature,
       typedPhrase: `  ${TYPING_PHRASE}  `,
     });
@@ -249,6 +256,7 @@ describe("POST /api/challenge/verify", () => {
       challengeId: challenge.challengeId,
       address: VALID_ADDRESS,
       chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
       signature,
       selectedAnswer: correctIndex,
     });
@@ -267,6 +275,7 @@ describe("POST /api/challenge/verify", () => {
       challengeId: challenge.challengeId,
       address: VALID_ADDRESS,
       chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
       signature,
       selectedAnswer: wrongIndex,
     });
@@ -307,7 +316,7 @@ describe("POST /api/challenge/verify", () => {
     consumeChallenge(challenge.challengeId);
     const { response, json } = await postVerify(body);
     expect(response.status).toBe(400);
-    expect(json).toEqual({ error: "CHALLENGE_CONSUMED" });
+    expect(json).toEqual({ error: "CHALLENGE_ALREADY_USED" });
   });
 
   it("rejects the wrong chain", async () => {
@@ -330,7 +339,7 @@ describe("POST /api/challenge/verify", () => {
     incrementAttempts(challenge.challengeId);
     const { response, json } = await postVerify(body);
     expect(response.status).toBe(400);
-    expect(json).toEqual({ error: "MAX_ATTEMPTS" });
+    expect(json).toEqual({ error: "TOO_MANY_ATTEMPTS" });
   });
 
   it("rejects an invalid signature", async () => {
@@ -342,6 +351,7 @@ describe("POST /api/challenge/verify", () => {
       challengeId: challenge.challengeId,
       address: VALID_ADDRESS,
       chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
       signature: wrongSignature,
       clickedNumbers: challenge.numbers,
     });
@@ -361,6 +371,7 @@ describe("POST /api/challenge/verify", () => {
       challengeId: challenge.challengeId,
       address: VALID_ADDRESS,
       chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
       signature,
       clickedNumbers: challenge.numbers,
     });
@@ -378,11 +389,83 @@ describe("POST /api/challenge/verify", () => {
       challengeId: challenge.challengeId,
       address: VALID_ADDRESS,
       chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
       signature,
       clickedNumbers: challenge.numbers,
     });
 
     expect(response.status).toBe(503);
     expect(json).toEqual({ error: "VERIFIER_INSUFFICIENT_FUNDS" });
+  });
+
+  // ── nonce / replay protection ─────────────────────────────────────────────────
+
+  it("rejects wrong nonce with NONCE_MISMATCH", async () => {
+    const { body } = await createSignedBody(
+      { clickedNumbers: [] },
+      { forceType: "number_sequence" }
+    );
+    const { response, json } = await postVerify({ ...body, nonce: "deadbeefdeadbeef" });
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: "NONCE_MISMATCH" });
+  });
+
+  it("rejects missing nonce with NONCE_MISMATCH", async () => {
+    const { body } = await createSignedBody(
+      { clickedNumbers: [] },
+      { forceType: "number_sequence" }
+    );
+    const bodyWithoutNonce = Object.fromEntries(Object.entries(body).filter(([k]) => k !== "nonce"));
+    const { response, json } = await postVerify(bodyWithoutNonce);
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: "NONCE_MISMATCH" });
+  });
+
+  it("prevents replay — second verify with same challengeId fails with CHALLENGE_ALREADY_USED", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
+    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const body = {
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
+      signature,
+      clickedNumbers: challenge.numbers,
+    };
+
+    const first = await postVerify(body);
+    expect(first.response.status).toBe(200);
+
+    const second = await postVerify(body);
+    expect(second.response.status).toBe(400);
+    expect(second.json).toEqual({ error: "CHALLENGE_ALREADY_USED" });
+  });
+
+  it("rejects wrong wallet address with INVALID_ADDRESS", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
+    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const wrongAddress = "0x000000000000000000000000000000000000dead";
+
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: wrongAddress,
+      chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
+      signature,
+      clickedNumbers: challenge.numbers,
+    });
+
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: "INVALID_ADDRESS" });
+  });
+
+  it("wrong nonce does not increment the attempt counter", async () => {
+    const { challenge, body } = await createSignedBody(
+      {},
+      { forceType: "number_sequence" }
+    );
+    const attemptsBefore = challenge.attempts;
+    await postVerify({ ...body, nonce: "wrongnonce", clickedNumbers: challenge.numbers });
+    expect(challenge.attempts).toBe(attemptsBefore);
   });
 });

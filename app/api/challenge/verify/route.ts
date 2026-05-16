@@ -31,6 +31,7 @@ type VerifyChallengeRequest = {
   challengeId?: unknown;
   address?: unknown;
   chainId?: unknown;
+  nonce?: unknown;
   signature?: unknown;
   // number_sequence
   clickedNumbers?: unknown;
@@ -144,18 +145,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "CHALLENGE_NOT_FOUND" }, { status: 400 });
   }
 
-  if (Date.now() > challenge.expiresAt) {
-    return NextResponse.json({ error: "CHALLENGE_EXPIRED" }, { status: 400 });
-  }
-
-  if (challenge.consumed) {
-    return NextResponse.json({ error: "CHALLENGE_CONSUMED" }, { status: 400 });
-  }
-
-  if (body.chainId !== challenge.chainId) {
-    return NextResponse.json({ error: "WRONG_CHAIN" }, { status: 400 });
-  }
-
+  // Address check first — don't leak state to wrong callers
   if (
     typeof body.address !== "string" ||
     body.address.toLowerCase() !== challenge.address.toLowerCase()
@@ -163,8 +153,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "INVALID_ADDRESS" }, { status: 400 });
   }
 
-  if (challenge.attempts >= 3) {
-    return NextResponse.json({ error: "MAX_ATTEMPTS" }, { status: 400 });
+  // Explicit nonce check — defense-in-depth on top of signature binding
+  if (typeof body.nonce !== "string" || body.nonce !== challenge.nonce) {
+    return NextResponse.json({ error: "NONCE_MISMATCH" }, { status: 400 });
+  }
+
+  if (Date.now() > challenge.expiresAt) {
+    return NextResponse.json({ error: "CHALLENGE_EXPIRED" }, { status: 400 });
+  }
+
+  if (challenge.consumed) {
+    return NextResponse.json({ error: "CHALLENGE_ALREADY_USED" }, { status: 400 });
+  }
+
+  if (body.chainId !== challenge.chainId) {
+    return NextResponse.json({ error: "WRONG_CHAIN" }, { status: 400 });
+  }
+
+  if (challenge.attempts >= challenge.maxAttempts) {
+    return NextResponse.json({ error: "TOO_MANY_ATTEMPTS" }, { status: 400 });
   }
 
   incrementAttempts(challenge.challengeId);
@@ -224,6 +231,7 @@ export async function POST(request: NextRequest) {
 
   const validUntil = Date.now() + PROOF_DURATION_MS;
 
+  // Mark as used immediately after success — replay protection
   consumeChallenge(challenge.challengeId);
   cacheProof(body.address, validUntil, receipt.transactionHash);
 

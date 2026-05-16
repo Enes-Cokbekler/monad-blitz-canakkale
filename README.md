@@ -1,79 +1,148 @@
 # HumanPass
 
-A proof-of-human session layer on Monad for consumer apps. Any app can gate actions behind a HumanPass check. Bots and AI agents are blocked at the protocol level — no extra code needed per-app.
+> Short-lived proof-of-human session layer for consumer apps on Monad.
+
+AI agents are flooding the internet. HumanPass lets apps verify real humans before sensitive actions. A user cannot perform a sensitive action until they complete a human challenge and receive an active on-chain HumanPass proof.
+
+**What HumanPass is:** A lightweight, temporary proof-of-human session issued on Monad. Any consumer app can gate actions behind it.
+
+**What HumanPass is not:** A global identity system. Perfect bot detection. Biometrics or persistent personal data.
+
+---
+
+## 60-Second Demo Script
+
+**For judges — use the `/demo` page as the main presentation view.**
+
+1. Open `/demo` → click **Start 60-second demo**. Steps auto-advance.
+2. **Step 1 (The Problem):** AI agents flood games, voting, rewards. Traditional solutions are invasive.
+3. **Step 2 (Bot Blocked):** Without HumanPass, any wallet can call any function. Bots get through.
+4. Open `/simulator` → **Start Simulation**. Judges watch bots get blocked in under 10 seconds.
+5. **Step 3 (Human Verified):** User connects wallet, completes a random human-signal challenge.
+6. Open `/verify` → complete the challenge (reaction, sequence, typing, or question).
+7. **Step 4 (Proof On-Chain):** HumanPass proof recorded on Monad. Show the Verified Human card.
+8. Open `/status` → paste the wallet address. Proof is readable by any app.
+9. Open `/vote` → vote successfully as a verified human. Unverified attempts are rejected.
+10. Open `/developers` → show the three-line integration. One modifier. One hook.
+11. Close: "One proof layer. Any consumer app on Monad. Bots out, humans in."
+
+---
 
 ## Pages
 
 | Route | Description |
 |---|---|
 | `/` | Landing page |
-| `/verify` | Complete human challenge, get on-chain proof |
+| `/demo` | **Judge demo** — guided 60-second flow |
+| `/verify` | Complete challenge, receive on-chain proof |
 | `/vote` | Protected voting demo (HumanPass-gated) |
 | `/status` | Look up any wallet's proof status |
 | `/humans` | Live feed of verified human wallets |
-| `/simulator` | Bot Attack Simulator — watch bots get blocked in real time |
+| `/simulator` | Bot Attack Simulator — watch bots get blocked |
 | `/developers` | Integration docs and code examples |
+
+---
+
+## Why Monad?
+
+- **Portable proofs** — A HumanPass proof issued once is valid across every integrated app on Monad. No per-app re-verification.
+- **Consumer-grade speed** — Monad's high throughput makes proof issuance feel instant. No waiting.
+- **EVM-compatible** — Any EVM contract integrates with one modifier import. No new tooling.
+- **Not locked to one backend** — The proof lives on-chain. Any app reads it directly from Monad. No HumanPass backend dependency after issuance.
+
+---
+
+## Human-Signal Challenges
+
+One of four challenge types is randomly selected per verification session. These are demo-quality signals — they raise the bar for bots but are not production-hardened security. The core value is the short-lived on-chain proof issued on Monad after the challenge is passed.
+
+| Challenge | What the user does | Backend validates |
+|---|---|---|
+| **Number Sequence** | Click 5 random numbers in order | Server-stored sequence vs submitted order |
+| **Reaction** | Wait for signal, click within time window | `clickedAt` timestamp vs server-calculated window |
+| **Typing Phrase** | Type an exact phrase while camera locally previews | Typed string vs server-stored phrase (exact match) |
+| **Human Signal Question** | Pick the funniest/most-human MCQ answer | Selected index vs server-stored correct index (never exposed in API) |
+
+**Privacy:** The typing challenge requests camera permission for a local-only liveness effect. No video is uploaded, stored, or sent to the backend. The stream stops immediately after the phrase is typed.
+
+---
+
+## Challenge Security
+
+Each verification session has multiple layers of server-side protection:
+
+| Protection | Mechanism |
+|---|---|
+| **Nonce** | 16-byte random hex generated per session. Must be echoed back in the verify request. Prevents session fixation. |
+| **Expiration** | Sessions expire after 120 seconds. Server checks `expiresAt` before validation. |
+| **One-time use** | `consumed` flag set immediately after a successful proof issuance. A second verify request with the same `challengeId` returns `CHALLENGE_ALREADY_USED`. |
+| **Attempt limit** | Max 3 attempts per session (`maxAttempts`). Wrong answers increment the counter; wrong nonce does not. |
+| **Address binding** | `challengeId` is tied to a wallet address. Cross-address use returns `INVALID_ADDRESS`. |
+| **Signature binding** | The signed message includes wallet, chain, challengeId, type, nonce, and expiry. Signature recovery is checked against the submitted address. |
+| **Chain binding** | `chainId` in the request must match the session's `chainId`. |
+
+Error codes returned by `POST /api/challenge/verify`:
+
+| Code | Meaning |
+|---|---|
+| `NONCE_MISMATCH` | Nonce missing or does not match session |
+| `CHALLENGE_EXPIRED` | Session TTL elapsed |
+| `CHALLENGE_ALREADY_USED` | Replay attempt — challenge already consumed |
+| `TOO_MANY_ATTEMPTS` | Attempt limit exceeded |
+| `INVALID_ADDRESS` | Address does not match session |
+| `WRONG_CHAIN` | Chain ID mismatch |
+| `INVALID_SIGNATURE` | Signature recovery failed or wrong signer |
+
+**MVP caveat:** Challenge state is in-memory. In a serverless or multi-instance deployment, replace the in-memory store with Redis.
+
+---
 
 ## Setup
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
+### Prerequisites
+- Node.js 18+
+- A Monad Testnet wallet (for the verifier)
+- WalletConnect Project ID
 
-2. Copy the environment template and fill in your values:
-   ```bash
-   cp .env.example .env.local
-   ```
-
-3. Add your WalletConnect Project ID to `.env.local`:
-   - Get one at https://cloud.walletconnect.com
-
-4. Add your verifier private key to `.env.local`:
-   - This is the wallet that will issue human proofs on-chain.
-   - Do NOT reuse a mainnet wallet. Create a fresh testnet wallet.
-
-5. Add the deployed HumanPass contract address to `.env.local` after deployment.
-
-## Development
-
-Start the local dev server:
+### Install
 
 ```bash
-npm run dev
+npm install
+```
+
+### Configure environment
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local`:
+
+```env
+# Required
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
+VERIFIER_PRIVATE_KEY=0x...           # Verifier wallet — funds it from Monad faucet
+NEXT_PUBLIC_HUMANPASS_CONTRACT_ADDRESS=0x...
+
+# Optional
+NEXT_PUBLIC_MONAD_RPC_URL=https://testnet-rpc.monad.xyz
+NEXT_PUBLIC_DEMO_MODE=false          # Set to true to simulate proof if Monad RPC is down
+```
+
+### Run locally
+
+```bash
+npm run dev          # Dev with Turbopack (fast)
+npm run demo         # Production build + start (recommended for demos)
 ```
 
 The app runs at http://localhost:3000.
 
-## Testing
-
-Run the full test suite:
-
-```bash
-npm run test
-```
-
-Run API tests only:
-
-```bash
-npm run test:api
-```
-
-Run smart contract tests only:
-
-```bash
-npm run test:contracts
-```
-
-Run end-to-end Playwright tests:
-
-```bash
-npm run test:e2e
-```
+---
 
 ## Contract Deployment
 
-Compile the HumanPass Solidity contract:
+Compile:
 
 ```bash
 npm run compile:contracts
@@ -85,98 +154,86 @@ Deploy to Monad Testnet:
 npm run deploy:monad
 ```
 
-After deployment, copy the contract address into your `.env.local` as `NEXT_PUBLIC_HUMANPASS_CONTRACT_ADDRESS`.
+Copy the output contract address into `NEXT_PUBLIC_HUMANPASS_CONTRACT_ADDRESS` in `.env.local`.
 
 ## Monad Testnet Values
 
 - Chain ID: `10143`
-- RPC URL: `https://testnet-rpc.monad.xyz`
+- RPC: `https://testnet-rpc.monad.xyz` (rate-limited — use dedicated RPC for production)
 - Explorer: https://testnet.monadexplorer.com/
-
-The public RPC is rate-limited. For production workloads, use a dedicated RPC provider.
 
 ## Verifier Wallet Funding
 
-The verifier wallet needs MON tokens to pay for gas when issuing proofs.
+The verifier wallet pays gas for each proof issuance. Fund it from the Monad faucet, then set `VERIFIER_PRIVATE_KEY` in `.env.local`. Never commit the private key.
 
-1. Get MON from the Monad testnet faucet.
-2. Paste the verifier wallet address into the faucet and request tokens.
-3. Confirm the balance in your wallet or on the explorer.
-4. Set the verifier private key in `.env.local` as `VERIFIER_PRIVATE_KEY`.
+---
 
-Never commit the private key. `.gitignore` blocks all `.env*` files except `.env.example`.
+## Testing
 
-## Single-Process In-Memory Limitation
+```bash
+npm run test          # All tests
+npm run test:api      # API tests only (44 tests)
+npm run test:contracts # Hardhat contract tests
+npm run test:e2e      # Playwright end-to-end
+```
 
-This MVP stores temporary challenge state in memory. That means:
+---
 
-- It only works within a single running process.
-- It is not safe for serverless deployments where each request may hit a different instance.
-- For production, replace in-memory state with Redis or a database.
+## Demo Mode
 
-## Human-Signal Challenges
+Set `NEXT_PUBLIC_DEMO_MODE=true` in `.env.local`.
 
-HumanPass supports four MVP-level human-signal challenge types. One is randomly selected per verification session. These are **demo-quality** challenges — they raise the bar for bots but are not production-grade bot detection. The core value is the **short-lived on-chain proof-of-human session** issued on Monad after any challenge is passed and the wallet signature is verified.
+When enabled, if the Monad RPC is unavailable or the verifier wallet is out of funds, the UI will simulate a successful proof issuance. The proof card clearly labels it as **"Demo Mode — simulated transaction"** and does not show a real tx hash or explorer link.
 
-| Challenge | What the user does | Backend validates |
-|---|---|---|
-| **Number Sequence** | Click 5 random numbers in order | Server-stored sequence vs submitted order |
-| **Reaction** | Wait for signal, click within the time window | `clickedAt` timestamp vs server-calculated window |
-| **Typing Phrase** | Type an exact phrase while camera is locally previewed | Typed string vs server-stored phrase (exact match) |
-| **Human Signal Question** | Pick the funniest/most-human multiple-choice answer | Selected index vs server-stored correct index (not exposed in API) |
+This is for presentations only. Do not enable in production.
 
-**Privacy:** The typing challenge requests camera permission for a local-only liveness effect. No video is uploaded, stored, or sent to the backend. The camera stream is stopped immediately after the phrase is typed.
+---
+
+## Known MVP Limits
+
+- **Single-process in-memory challenge state** — Not safe for serverless deployments where each request may hit a different instance. For production, replace with Redis.
+- **Human challenges are demo-quality** — They raise the bar for bots but are not production security hardened.
+- **No proof renewal** — Users must re-verify when the proof expires.
+- **No cross-app proof standards** — Each app integrates independently. A standard registry would improve UX.
+- **Public RPC is rate-limited** — Use a dedicated Monad RPC provider for production.
+
+---
+
+## Future Roadmap
+
+- Stronger, randomized challenges with server-side timing validation
+- Proof renewal without re-running the full challenge flow
+- Cross-app proof registry and standards
+- SDK packages (`@humanpass/sdk`, `@humanpass/react`)
+- Mainnet deployment
+- Proof expiry configurable per-app
+- Webhook for apps to receive proof-issued events
+
+---
 
 ## Developer Integration
 
-HumanPass exposes a single read function: `isHuman(address) → bool`.
+One modifier in your Solidity contract:
 
-**Solidity — gate a contract function:**
 ```solidity
-interface IHumanPass {
-    function isHuman(address wallet) external view returns (bool);
-}
-
 modifier onlyHuman() {
     require(IHumanPass(HUMANPASS_CONTRACT).isHuman(msg.sender), "No HumanPass");
     _;
 }
 ```
 
-**TypeScript / viem — check off-chain:**
-```ts
-const isVerified = await client.readContract({
-  address: HUMANPASS_CONTRACT,
-  abi: [{ name: "isHuman", type: "function", stateMutability: "view",
-          inputs: [{ name: "wallet", type: "address" }],
-          outputs: [{ name: "", type: "bool" }] }],
-  functionName: "isHuman",
-  args: [walletAddress],
-});
+One hook in your React frontend:
+
+```typescript
+const { isHuman, expiresAt } = useHumanPass(address);
 ```
 
-See `/developers` for full examples including React/wagmi gate component.
+One function call anywhere:
 
-## Bot Attack Simulator
+```typescript
+const isHuman = await humanpass.isHuman(address);
+if (!isHuman) redirect("/verify");
+allowProtectedAction();
+```
 
-Open `/simulator` to watch the protection in action:
-
-- AI agents and bots continuously attempt protected actions (vote, claim reward, join game).
-- Every unverified request is blocked with the reason shown (e.g. "No HumanPass").
-- Verified human wallets pass through.
-- Live counters show total attempts, bots blocked, humans accepted, and protection rate.
-
-Use this during a demo to make the value of HumanPass obvious in under 10 seconds.
-
-## Demo Script
-
-1. Open `/` and explain the problem: AI agents and bots flood consumer apps.
-2. Open `/simulator` — hit "Start Simulation". Judges watch bots get blocked in real time.
-3. Point out the protection rate counter (typically 75–85%).
-4. Connect a wallet. Open `/verify` and complete the human challenge.
-5. Show the Verified Human proof card — wallet, tx hash, expiry, contract address.
-6. Open `/vote` — vote successfully as a verified human.
-7. Open `/status` — show the on-chain proof is queryable for any wallet.
-8. Open `/humans` — show the live feed of verified wallets.
-9. Open `/developers` — show that any app integrates with one function call.
-10. Close: "One proof layer. Any consumer app on Monad. Bots out, humans in."
+See `/developers` for full Solidity, viem, and React/wagmi examples.

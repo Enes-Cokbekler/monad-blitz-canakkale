@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from "crypto";
 import {
   CHALLENGE_TTL_MS,
   FUNNY_QUESTIONS,
+  MAX_ATTEMPTS,
   TYPING_PHRASE,
   type ChallengeSession,
   type ChallengeType,
@@ -64,11 +65,14 @@ function buildSession(
   chainId: number,
   type: ChallengeType
 ): ChallengeSession {
+  const now = Date.now();
   const base: ChallengeSession = {
     challengeId: randomUUID(),
     nonce: createNonce(),
-    expiresAt: Date.now() + CHALLENGE_TTL_MS,
+    createdAt: now,
+    expiresAt: now + CHALLENGE_TTL_MS,
     attempts: 0,
+    maxAttempts: MAX_ATTEMPTS,
     consumed: false,
     address,
     chainId,

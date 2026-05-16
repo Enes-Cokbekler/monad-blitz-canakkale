@@ -3,6 +3,31 @@ import Link from "next/link";
 const CONTRACT_ADDRESS =
   process.env.NEXT_PUBLIC_HUMANPASS_CONTRACT_ADDRESS ?? "0x<HumanPass Contract>";
 
+const SDK_QUICKSTART = `// Pseudocode — wraps the viem read below
+import { humanpass } from "@humanpass/sdk";
+
+const isHuman = await humanpass.isHuman(address);
+
+if (!isHuman) {
+  redirect("/verify");
+}
+
+allowProtectedAction();`;
+
+const REACT_HOOK = `import { useHumanPass } from "@humanpass/react";
+
+export function ProtectedPage({ address }) {
+  const { isHuman, expiresAt, isLoading } = useHumanPass(address);
+
+  if (isLoading) return <Spinner />;
+
+  if (!isHuman) {
+    return <RedirectToVerify />;
+  }
+
+  return <YourProtectedContent expiresAt={expiresAt} />;
+}`;
+
 const SOLIDITY_SNIPPET = `// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
@@ -20,22 +45,22 @@ contract MyProtectedApp {
     }
 
     function vote(uint8 option) external onlyHuman {
-        // only verified humans reach here
+        // Only verified humans reach this line
+    }
+
+    function claimReward() external onlyHuman {
+        // Bots cannot call this
     }
 }`;
 
-const JS_CHECK_SNIPPET = `import { createPublicClient, http } from "viem";
+const VIEM_SNIPPET = `import { createPublicClient, http } from "viem";
 import { monadTestnet } from "viem/chains";
 
 const HUMANPASS = "${CONTRACT_ADDRESS}";
 const ABI = [
-  {
-    name: "isHuman",
-    type: "function",
-    stateMutability: "view",
+  { name: "isHuman", type: "function", stateMutability: "view",
     inputs: [{ name: "wallet", type: "address" }],
-    outputs: [{ name: "", type: "bool" }],
-  },
+    outputs: [{ name: "", type: "bool" }] },
 ] as const;
 
 const client = createPublicClient({
@@ -52,40 +77,7 @@ export async function checkHuman(address: string): Promise<boolean> {
   });
 }`;
 
-const REACT_GATE_SNIPPET = `"use client";
-
-import { useReadContract } from "wagmi";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-
-const HUMANPASS = "${CONTRACT_ADDRESS}";
-const ABI = [
-  { name: "isHuman", type: "function", stateMutability: "view",
-    inputs: [{ name: "wallet", type: "address" }],
-    outputs: [{ name: "", type: "bool" }] },
-] as const;
-
-export function HumanGate({ address }: { address: string }) {
-  const router = useRouter();
-  const { data: isHuman } = useReadContract({
-    address: HUMANPASS,
-    abi: ABI,
-    functionName: "isHuman",
-    args: [address as \`0x\${string}\`],
-  });
-
-  useEffect(() => {
-    if (isHuman === false) {
-      // redirect unverified users to get their HumanPass
-      router.push("https://humanpass.xyz/verify");
-    }
-  }, [isHuman, router]);
-
-  if (!isHuman) return <p>Checking verification…</p>;
-  return null; // user is verified, render your protected UI
-}`;
-
-function CodeBlock({ code }: { code: string; lang?: string }) {
+function CodeBlock({ code }: { code: string }) {
   return (
     <pre className="overflow-x-auto rounded-lg border border-surface-border bg-surface-secondary p-4 text-xs leading-relaxed text-text-primary">
       <code>{code}</code>
@@ -97,6 +89,7 @@ export default function DevelopersPage() {
   return (
     <main className="relative flex min-h-screen flex-col items-center overflow-x-hidden px-6 py-12">
       <div className="w-full max-w-4xl">
+        {/* Header */}
         <div className="mb-10">
           <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-monad-cyan/30 bg-monad-cyan/10 px-3 py-1 text-xs font-semibold text-monad-cyan">
             DEVELOPER DOCS
@@ -104,34 +97,26 @@ export default function DevelopersPage() {
           <h1 className="text-3xl font-bold text-text-primary">Integrate HumanPass</h1>
           <p className="mt-2 max-w-2xl text-text-secondary">
             HumanPass is a reusable proof-of-human session layer. Any consumer app on Monad can gate
-            actions behind a HumanPass check — votes, rewards, airdrops, game slots. Users verify
-            once; every app benefits.
+            sensitive actions behind a HumanPass check — one function call, any contract, any frontend.
+            Users verify once. Every integrated app benefits.
           </p>
         </div>
+
+        {/* Quickstart — most important */}
+        <section className="mb-10">
+          <h2 className="mb-3 text-xl font-bold text-text-primary">Quickstart</h2>
+          <p className="mb-4 text-sm text-text-secondary">Three lines. That&apos;s the integration.</p>
+          <CodeBlock code={SDK_QUICKSTART} />
+        </section>
 
         {/* Architecture */}
         <section className="mb-10">
           <h2 className="mb-4 text-xl font-bold text-text-primary">How It Works</h2>
           <div className="grid gap-4 sm:grid-cols-3">
             {[
-              {
-                step: "1",
-                title: "User Verifies",
-                body: "User completes a human challenge on HumanPass. An on-chain proof is issued to their wallet on Monad.",
-                icon: "🛡️",
-              },
-              {
-                step: "2",
-                title: "Your App Checks",
-                body: "Your contract calls isHuman(wallet) or your frontend reads the same. One line of code.",
-                icon: "🔍",
-              },
-              {
-                step: "3",
-                title: "Action Gated",
-                body: "Verified humans proceed. Bots and unverified wallets are blocked — no extra code needed.",
-                icon: "✅",
-              },
+              { step: "1", icon: "🛡️", title: "User Verifies", body: "Completes a human challenge on HumanPass. An on-chain proof is issued to their wallet on Monad." },
+              { step: "2", icon: "🔍", title: "Your App Checks", body: "Your contract or frontend calls isHuman(address). One read. No backend call to HumanPass." },
+              { step: "3", icon: "✅", title: "Action Gated", body: "Verified humans proceed. Bots and unverified wallets are blocked automatically." },
             ].map((item) => (
               <div key={item.step} className="card-base bg-card-shine">
                 <span className="mb-3 block text-3xl">{item.icon}</span>
@@ -142,7 +127,7 @@ export default function DevelopersPage() {
           </div>
         </section>
 
-        {/* Contract details */}
+        {/* Contract info */}
         <section className="mb-10 rounded-xl border border-surface-border bg-surface-secondary p-6">
           <h2 className="mb-4 text-lg font-bold text-text-primary">Contract Info</h2>
           <div className="space-y-3 text-sm">
@@ -155,61 +140,58 @@ export default function DevelopersPage() {
               <span className="break-all font-mono text-monad-cyan">{CONTRACT_ADDRESS}</span>
             </div>
             <div className="flex items-center justify-between gap-4">
-              <span className="text-text-muted">Proof duration</span>
-              <span className="text-text-primary">30 days per verification</span>
+              <span className="text-text-muted">Key function</span>
+              <code className="rounded bg-surface-card px-2 py-0.5 text-xs text-monad-purple-light">
+                isHuman(address) → bool
+              </code>
             </div>
             <div className="flex items-center justify-between gap-4">
-              <span className="text-text-muted">Key function</span>
-              <span className="font-mono text-monad-purple-light">isHuman(address) → bool</span>
+              <span className="text-text-muted">Proof duration</span>
+              <span className="text-text-primary">10 minutes per verification (MVP)</span>
             </div>
           </div>
         </section>
 
-        {/* Code snippets */}
+        {/* Code examples */}
         <section className="mb-10 space-y-8">
           <h2 className="text-xl font-bold text-text-primary">Code Examples</h2>
 
           <div>
-            <h3 className="mb-2 font-semibold text-text-primary">
-              1. Solidity — Gate a contract function
-            </h3>
+            <h3 className="mb-2 font-semibold text-text-primary">React hook</h3>
             <p className="mb-3 text-sm text-text-secondary">
-              Add the <code className="text-monad-cyan">onlyHuman</code> modifier to any function you want to protect.
+              Drop <code className="text-monad-cyan">useHumanPass</code> at the top of any protected component.
             </p>
-            <CodeBlock code={SOLIDITY_SNIPPET} lang="solidity" />
+            <CodeBlock code={REACT_HOOK} />
           </div>
 
           <div>
-            <h3 className="mb-2 font-semibold text-text-primary">
-              2. TypeScript / viem — Check a wallet off-chain
-            </h3>
+            <h3 className="mb-2 font-semibold text-text-primary">Solidity — onlyHuman modifier</h3>
             <p className="mb-3 text-sm text-text-secondary">
-              Use this in a backend API route or server action to validate before processing a request.
+              Add to any function you want to protect. Bots calling it directly revert immediately.
             </p>
-            <CodeBlock code={JS_CHECK_SNIPPET} />
+            <CodeBlock code={SOLIDITY_SNIPPET} />
           </div>
 
           <div>
-            <h3 className="mb-2 font-semibold text-text-primary">
-              3. React / wagmi — Gate a UI component
-            </h3>
+            <h3 className="mb-2 font-semibold text-text-primary">TypeScript / viem — raw read</h3>
             <p className="mb-3 text-sm text-text-secondary">
-              Drop <code className="text-monad-cyan">{"<HumanGate />"}</code> at the top of any protected page. Unverified users are redirected to verify.
+              Use in a backend API route, server action, or middleware to validate before processing.
             </p>
-            <CodeBlock code={REACT_GATE_SNIPPET} />
+            <CodeBlock code={VIEM_SNIPPET} />
           </div>
         </section>
 
-        {/* Why reusable */}
+        {/* Use cases */}
         <section className="mb-10 rounded-xl border border-monad-purple/30 bg-monad-purple/10 p-6">
           <h2 className="mb-3 font-bold text-monad-purple-light">One Layer, Any App</h2>
           <ul className="space-y-2 text-sm text-text-secondary">
             {[
-              "Governance — only real users vote on proposals",
+              "Governance — only real users vote on proposals, no sybil manipulation",
               "Gaming — bot-free leaderboards and matchmaking",
-              "Airdrops — fair token distribution to humans",
-              "Reward claims — no sybil farming",
+              "Airdrops — fair token distribution, no farming bots",
+              "Reward claims — no automated reward drain",
               "Chat & forums — eliminate AI spam at the protocol layer",
+              "Events & tickets — one proof, one human, one entry",
             ].map((item) => (
               <li key={item} className="flex items-start gap-2">
                 <span className="mt-0.5 text-monad-cyan">→</span>
@@ -219,17 +201,18 @@ export default function DevelopersPage() {
           </ul>
         </section>
 
-        {/* CTA */}
+        {/* Positioning note */}
+        <div className="mb-10 rounded-lg border border-surface-border bg-surface-secondary px-5 py-4 text-xs text-text-muted">
+          <p className="font-semibold text-text-secondary mb-1">MVP note</p>
+          <p>HumanPass is not a global identity system or perfect bot detection. The challenges are demo-quality human signals — they raise the bar significantly but are not production security hardened. The core value is the short-lived on-chain proof issued on Monad. Future work includes stronger challenges, proof renewal, and cross-app proof sharing standards.</p>
+        </div>
+
+        {/* CTAs */}
         <div className="flex flex-wrap gap-3">
-          <Link href="/verify" className="btn-primary">
-            Get Your HumanPass →
-          </Link>
-          <Link href="/simulator" className="btn-secondary">
-            See Bot Simulator
-          </Link>
-          <Link href="/vote" className="btn-secondary">
-            Vote Demo
-          </Link>
+          <Link href="/verify" className="btn-primary">Get Your HumanPass →</Link>
+          <Link href="/simulator" className="btn-secondary">See Bot Simulator</Link>
+          <Link href="/vote" className="btn-secondary">Vote Demo</Link>
+          <Link href="/demo" className="btn-secondary">60-Second Demo</Link>
         </div>
       </div>
     </main>

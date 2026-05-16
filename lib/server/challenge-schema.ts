@@ -47,11 +47,16 @@ export const FUNNY_QUESTIONS: FunnyQuestion[] = [
   },
 ];
 
+export const MAX_ATTEMPTS = 3;
+
 export type ChallengeSession = {
   challengeId: string;
   nonce: string;
+  createdAt: number;
   expiresAt: number;
   attempts: number;
+  maxAttempts: number;
+  /** One-time use flag — true after successful verification */
   consumed: boolean;
   address: string;
   chainId: number;

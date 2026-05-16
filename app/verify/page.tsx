@@ -16,6 +16,7 @@ import { useDemoAccount, useDemoSignMessage } from "@/lib/e2e-wallet";
 import { monadTestnet } from "@/lib/wagmi/config";
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_HUMANPASS_CONTRACT_ADDRESS;
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
 type ChallengeType = "number_sequence" | "reaction" | "typing_phrase" | "funny_question";
 
@@ -42,6 +43,7 @@ type VerifyResult = {
   txHash: string;
   validUntil: number;
   contractAddress?: string;
+  isDemo?: boolean;
 };
 
 type ChallengeAnswer =
@@ -219,6 +221,7 @@ export default function VerifyPage() {
           challengeId: challenge.challengeId,
           address,
           chainId: monadTestnet.id,
+          nonce: challenge.nonce,
           signature,
           ...answerPayload,
         }),
@@ -233,6 +236,33 @@ export default function VerifyPage() {
           setPhase("challenge");
           setError("Wrong answer. Try again.");
           setErrorCode(code);
+          return;
+        }
+        if (code === "TOO_MANY_ATTEMPTS" || code === "CHALLENGE_ALREADY_USED" || code === "NONCE_MISMATCH" || code === "CHALLENGE_EXPIRED") {
+          setPhase("error");
+          setError(
+            code === "TOO_MANY_ATTEMPTS" ? "Maximum attempts reached. Please start a new challenge." :
+            code === "CHALLENGE_ALREADY_USED" ? "This challenge has already been used. Please start a new challenge." :
+            code === "NONCE_MISMATCH" ? "Session error. Please start a new challenge." :
+            "Challenge expired. Please start a new challenge."
+          );
+          setErrorCode(code);
+          return;
+        }
+        // Demo mode fallback: simulate proof if verifier is not configured / out of funds
+        if (
+          DEMO_MODE &&
+          (code === "VERIFIER_NOT_CONFIGURED" || code === "VERIFIER_INSUFFICIENT_FUNDS")
+        ) {
+          const simulatedUntil = Math.floor(Date.now() / 1000) + 600;
+          setVerifyResult({
+            status: "verified",
+            txHash: "0x0000000000000000000000000000000000000000000000000000000DEMO",
+            validUntil: simulatedUntil,
+            contractAddress: CONTRACT_ADDRESS,
+            isDemo: true,
+          });
+          setPhase("success");
           return;
         }
         setPhase("error");
@@ -257,7 +287,7 @@ export default function VerifyPage() {
   const handleChallengeFail = useCallback((reason: string) => {
     const newAttempts = attempts + 1;
     setAttempts(newAttempts);
-    if (newAttempts >= 3 || reason === "TOO_EARLY" || reason === "TOO_LATE" || reason === "MAX_ATTEMPTS") {
+    if (newAttempts >= 3 || reason === "TOO_EARLY" || reason === "TOO_LATE" || reason === "TOO_MANY_ATTEMPTS") {
       setPhase("error");
       setError(
         reason === "TOO_EARLY" ? "You clicked too early. Start a new challenge." :
@@ -415,7 +445,9 @@ export default function VerifyPage() {
                 <ErrorCallout
                   title={
                     errorCode === "CHALLENGE_EXPIRED" ? "Challenge Expired" :
-                    errorCode === "MAX_ATTEMPTS" || errorCode === "TOO_EARLY" || errorCode === "TOO_LATE" ? "Challenge Failed" :
+                    errorCode === "TOO_MANY_ATTEMPTS" || errorCode === "TOO_EARLY" || errorCode === "TOO_LATE" ? "Challenge Failed" :
+                    errorCode === "CHALLENGE_ALREADY_USED" ? "Challenge Already Used" :
+                    errorCode === "NONCE_MISMATCH" ? "Session Error" :
                     errorCode === "SIGNATURE_REJECTED" ? "Signature Rejected" :
                     errorCode === "VERIFIER_NOT_CONFIGURED" ? "Verifier Not Configured" :
                     errorCode === "VERIFIER_INSUFFICIENT_FUNDS" ? "Verifier Needs Testnet MON" :
@@ -427,7 +459,7 @@ export default function VerifyPage() {
                       : error ?? "An unknown error occurred."
                   }
                   variant={
-                    ["CHALLENGE_EXPIRED", "MAX_ATTEMPTS", "TOO_EARLY", "TOO_LATE"].includes(errorCode ?? "")
+                    ["CHALLENGE_EXPIRED", "TOO_MANY_ATTEMPTS", "TOO_EARLY", "TOO_LATE", "CHALLENGE_ALREADY_USED"].includes(errorCode ?? "")
                       ? "warning" : "error"
                   }
                   className="mb-6"
@@ -545,12 +577,13 @@ export default function VerifyPage() {
 
                 <HumanPassCard
                   status="verified"
-                  txHash={verifyResult.txHash}
+                  txHash={verifyResult.isDemo ? undefined : verifyResult.txHash}
                   validUntil={verifyResult.validUntil}
                   chainName={monadTestnet.name}
                   walletAddress={address}
                   contractAddress={verifyResult.contractAddress ?? CONTRACT_ADDRESS}
                   showActions
+                  isDemo={verifyResult.isDemo}
                   className="mb-6"
                 />
               </div>
