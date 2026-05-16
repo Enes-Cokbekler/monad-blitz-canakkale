@@ -17,7 +17,9 @@ import {
   getHumanPassTypes,
 } from "@/lib/eip712";
 import { humanPassAbi } from "@/lib/contracts/HumanPass.abi";
+import { WrongNetworkBanner } from "@/components/wrong-network-banner";
 import { useDemoAccount, useDemoSignTypedData } from "@/lib/e2e-wallet";
+import { useMonadNetwork } from "@/hooks/use-monad-network";
 import { monadTestnet } from "@/lib/wagmi/config";
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_HUMANPASS_CONTRACT_ADDRESS;
@@ -82,8 +84,9 @@ function formatExpiry(validUntil: number): string {
 }
 
 export default function VerifyPage() {
-  const { address, isConnected, chainId } = useDemoAccount();
+  const { address, isConnected } = useDemoAccount();
   const { signTypedDataAsync } = useDemoSignTypedData();
+  const { isWrongNetwork: isWrongChain, switchToMonad, isSwitching: isSwitchingNetwork } = useMonadNetwork();
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [challenge, setChallenge] = useState<ChallengeData | null>(null);
@@ -94,7 +97,6 @@ export default function VerifyPage() {
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isWrongChain = isConnected && chainId !== monadTestnet.id;
 
   const { data: isHuman, isError: isHumanReadError } = useReadContract({
     address: CONTRACT_ADDRESS as `0x${string}` | undefined,
@@ -338,12 +340,7 @@ export default function VerifyPage() {
             <WalletConnect />
           </div>
 
-          {isWrongChain && (
-            <ErrorCallout
-              message={`HumanPass only works on ${monadTestnet.name} (ID: ${monadTestnet.id}). Please switch network.`}
-              className="mb-6"
-            />
-          )}
+          <WrongNetworkBanner className="mb-6" />
 
           <HumanPassCard
             status="verified"
@@ -377,12 +374,7 @@ export default function VerifyPage() {
           <WalletConnect />
         </div>
 
-        {isWrongChain && (
-          <ErrorCallout
-            message={`HumanPass only works on ${monadTestnet.name} (ID: ${monadTestnet.id}). Please switch network.`}
-            className="mb-6"
-          />
-        )}
+        <WrongNetworkBanner className="mb-6" />
 
         {isConnected && !isWrongChain && hasProofReadError && (
           <ErrorCallout
@@ -407,7 +399,15 @@ export default function VerifyPage() {
             <h2 className="text-xl font-semibold text-text-primary">Wrong Network</h2>
             <p className="max-w-md text-text-secondary">
               HumanPass only works on {monadTestnet.name} (ID: {monadTestnet.id}).
+              Switch networks to begin verification.
             </p>
+            <button
+              onClick={switchToMonad}
+              disabled={isSwitchingNetwork}
+              className="btn-primary disabled:opacity-60"
+            >
+              {isSwitchingNetwork ? "Switching…" : `Switch to ${monadTestnet.name}`}
+            </button>
           </div>
         )}
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
 import { ErrorCallout } from "@/components/error-callout";
+import { WrongNetworkBanner } from "@/components/wrong-network-banner";
 
 type SerializedEvent = {
   type: "ISSUED" | "REVOKED";
@@ -93,6 +94,8 @@ export default function ActivityPage() {
   return (
     <main className="relative flex min-h-screen flex-col items-center overflow-x-hidden px-6 py-12">
       <div className="w-full max-w-4xl">
+        <WrongNetworkBanner className="mb-6" />
+
         {/* Header */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ErrorCallout } from "@/components/error-callout";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/status-badge";
 import { WalletConnect } from "@/components/wallet-connect";
+import { WrongNetworkBanner } from "@/components/wrong-network-banner";
 import { useDemoAccount } from "@/lib/e2e-wallet";
 
 type ProofStatusResponse = {
@@ -156,6 +157,8 @@ export default function StatusPage() {
             </button>
           </div>
         </form>
+
+        <WrongNetworkBanner className="mb-6" />
 
         {error && (
           <ErrorCallout

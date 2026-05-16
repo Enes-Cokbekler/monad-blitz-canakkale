@@ -7,7 +7,9 @@ import { WalletConnect } from "@/components/wallet-connect";
 import { ErrorCallout } from "@/components/error-callout";
 import { StatusBadge } from "@/components/status-badge";
 import { humanPassAbi } from "@/lib/contracts/HumanPass.abi";
+import { WrongNetworkBanner } from "@/components/wrong-network-banner";
 import { useDemoAccount, useDemoSignMessage } from "@/lib/e2e-wallet";
+import { useMonadNetwork } from "@/hooks/use-monad-network";
 import { VOTE_OPTIONS, type VoteOptionId } from "@/lib/server/vote-store";
 import { monadTestnet } from "@/lib/wagmi/config";
 
@@ -47,16 +49,15 @@ function createNonce() {
 type Results = Record<VoteOptionId, number>;
 
 export default function VotePage() {
-  const { address, isConnected, chainId } = useDemoAccount();
+  const { address, isConnected } = useDemoAccount();
   const { signMessageAsync } = useDemoSignMessage();
+  const { isWrongNetwork: isWrongChain } = useMonadNetwork();
 
   const [results, setResults] = useState<Results>({ sdk: 0, votes: 0, events: 0 });
   const [userVote, setUserVote] = useState<VoteOptionId | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
-  const isWrongChain = isConnected && chainId !== monadTestnet.id;
 
   const { data: isHuman, isError: isHumanReadError } = useReadContract({
     address: CONTRACT_ADDRESS as `0x${string}` | undefined,
@@ -183,12 +184,7 @@ export default function VotePage() {
           <WalletConnect />
         </div>
 
-        {isWrongChain && (
-          <ErrorCallout
-            message={`You are connected to an unsupported network. HumanPass only works on ${monadTestnet.name} (ID: ${monadTestnet.id}). Please switch your network to continue.`}
-            className="mb-6"
-          />
-        )}
+        <WrongNetworkBanner className="mb-6" />
 
         {isConnected && !isWrongChain && hasProofReadError && (
           <ErrorCallout

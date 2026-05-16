@@ -227,6 +227,20 @@ This is for presentations only. Do not enable in production.
 
 ---
 
+## Wallet Network UX
+
+HumanPass expects wallets to be connected to Monad Testnet (chain ID `10143`).
+
+| Behaviour | Detail |
+|---|---|
+| **Network detection** | The app checks `chainId` from the connected wallet on every page load. |
+| **Wrong network banner** | A yellow banner appears on `/verify`, `/vote`, `/status`, `/activity`, and `/humans` when the wallet is on the wrong network. |
+| **One-click switch** | The banner and the blocked-action card both include a "Switch to Monad Testnet" button that calls wagmi's `useSwitchChain`. Wallets that support `wallet_addEthereumChain` will auto-prompt to add the chain. |
+| **Protected actions gated** | Proof issuance and voting are blocked until the wallet is on Monad Testnet. Status and activity lookups still work (they read from the server-side RPC). |
+| **Graceful failures** | User rejection and unsupported-switch errors show friendly messages instead of crashing. |
+
+---
+
 ## Operational Safety
 
 | Mechanism | What it does |

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ErrorCallout } from "@/components/error-callout";
 import { StatusBadge } from "@/components/status-badge";
 import { WalletConnect } from "@/components/wallet-connect";
+import { WrongNetworkBanner } from "@/components/wrong-network-banner";
 
 type LiveHuman = {
   address: string;
@@ -87,6 +88,8 @@ export default function HumansPage() {
           </div>
           <WalletConnect />
         </div>
+
+        <WrongNetworkBanner className="mb-6" />
 
         {error && (
           <ErrorCallout

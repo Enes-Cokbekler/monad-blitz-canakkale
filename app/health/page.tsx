@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { WalletConnect } from "@/components/wallet-connect";
+import { MONAD_CHAIN_ID, useMonadNetwork } from "@/hooks/use-monad-network";
 
 type HealthResponse = {
   ok: boolean;
@@ -89,6 +90,7 @@ export default function HealthPage() {
   }, [fetchHealth]);
 
   const overallOk = health?.ok ?? null;
+  const { connectedChainId, isConnected, isCorrectNetwork } = useMonadNetwork();
 
   return (
     <main className="relative flex min-h-screen flex-col items-center overflow-x-hidden px-6 py-12">
@@ -146,7 +148,22 @@ export default function HealthPage() {
                 ok={health.rpc === "ok" ? true : health.rpc === "not_configured" ? null : false}
               />
               {health.chainId !== undefined && (
-                <Row label="Chain ID" value={String(health.chainId)} />
+                <Row label="RPC chain ID" value={String(health.chainId)} />
+              )}
+              <Row label="Expected chain ID" value={String(MONAD_CHAIN_ID)} />
+              {isConnected && (
+                <Row
+                  label="Wallet chain ID"
+                  value={connectedChainId !== undefined ? String(connectedChainId) : "Unknown"}
+                  ok={isCorrectNetwork}
+                />
+              )}
+              {isConnected && (
+                <Row
+                  label="Correct network"
+                  value={isCorrectNetwork ? "Yes" : "No — wrong network"}
+                  ok={isCorrectNetwork}
+                />
               )}
             </section>
 

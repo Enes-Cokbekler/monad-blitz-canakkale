@@ -323,6 +323,18 @@ export default function DevelopersPage() {
           <CodeBlock code={EIP712_SNIPPET} />
         </section>
 
+        {/* Network note */}
+        <div className="mb-10 rounded-lg border border-monad-cyan/20 bg-monad-cyan/5 px-5 py-4 text-sm text-text-secondary">
+          <p className="font-semibold text-monad-cyan mb-1">Monad Testnet — Chain ID 10143</p>
+          <p>
+            Apps integrating HumanPass should check Monad Testnet chain ID 10143 before requesting
+            proof signatures or calling protected actions. If the user is on the wrong network,
+            prompt them to switch before continuing. Use wagmi&apos;s{" "}
+            <code className="text-monad-cyan">useSwitchChain</code> or call{" "}
+            <code className="text-monad-cyan">wallet_addEthereumChain</code> with chain ID 10143.
+          </p>
+        </div>
+
         {/* Positioning note */}
         <div className="mb-10 rounded-lg border border-surface-border bg-surface-secondary px-5 py-4 text-xs text-text-muted">
           <p className="font-semibold text-text-secondary mb-1">MVP note</p>
