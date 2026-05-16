@@ -114,6 +114,19 @@ This MVP stores temporary challenge state in memory. That means:
 - It is not safe for serverless deployments where each request may hit a different instance.
 - For production, replace in-memory state with Redis or a database.
 
+## Human-Signal Challenges
+
+HumanPass supports four MVP-level human-signal challenge types. One is randomly selected per verification session. These are **demo-quality** challenges — they raise the bar for bots but are not production-grade bot detection. The core value is the **short-lived on-chain proof-of-human session** issued on Monad after any challenge is passed and the wallet signature is verified.
+
+| Challenge | What the user does | Backend validates |
+|---|---|---|
+| **Number Sequence** | Click 5 random numbers in order | Server-stored sequence vs submitted order |
+| **Reaction** | Wait for signal, click within the time window | `clickedAt` timestamp vs server-calculated window |
+| **Typing Phrase** | Type an exact phrase while camera is locally previewed | Typed string vs server-stored phrase (exact match) |
+| **Human Signal Question** | Pick the funniest/most-human multiple-choice answer | Selected index vs server-stored correct index (not exposed in API) |
+
+**Privacy:** The typing challenge requests camera permission for a local-only liveness effect. No video is uploaded, stored, or sent to the backend. The camera stream is stopped immediately after the phrase is typed.
+
 ## Developer Integration
 
 HumanPass exposes a single read function: `isHuman(address) → bool`.

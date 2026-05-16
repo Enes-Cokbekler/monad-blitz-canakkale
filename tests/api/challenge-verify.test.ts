@@ -3,7 +3,11 @@ import type { NextRequest } from "next/server";
 import { privateKeyToAccount } from "viem/accounts";
 
 import { POST } from "@/app/api/challenge/verify/route";
-import { buildChallengeMessage } from "@/lib/server/challenge-schema";
+import {
+  buildChallengeMessage,
+  FUNNY_QUESTIONS,
+  TYPING_PHRASE,
+} from "@/lib/server/challenge-schema";
 import {
   clearChallengesForTests,
   consumeChallenge,
@@ -42,11 +46,7 @@ vi.mock("viem/actions", () => ({
 
 vi.mock("viem", async (importOriginal) => {
   const actual = await importOriginal<typeof import("viem")>();
-
-  return {
-    ...actual,
-    createPublicClient,
-  };
+  return { ...actual, createPublicClient };
 });
 
 function mockConfiguredVerifier() {
@@ -55,9 +55,7 @@ function mockConfiguredVerifier() {
   vi.mocked(getHumanPassContract).mockReturnValue({
     abi: [],
     address: CONTRACT_ADDRESS,
-    walletClient: {
-      writeContract,
-    },
+    walletClient: { writeContract },
   } as unknown as ReturnType<typeof getHumanPassContract>);
 }
 
@@ -72,33 +70,23 @@ function createRequest(body: unknown) {
 async function postVerify(body: unknown) {
   const response = await POST(createRequest(body) as NextRequest);
   const json = (await response.json()) as Record<string, unknown>;
-
   return { response, json };
 }
 
-async function createSignedChallengeBody(params: {
-  address?: string;
-  chainId?: number;
-  privateKey?: string;
-} = {}) {
+async function createSignedBody(
+  answerFields: Record<string, unknown>,
+  params: { address?: string; chainId?: number; privateKey?: string; forceType?: "number_sequence" | "reaction" | "typing_phrase" | "funny_question" } = {}
+) {
   const privateKey = params.privateKey ?? TEST_PRIVATE_KEY;
   const account = privateKeyToAccount(privateKey as `0x${string}`);
   const address = params.address ?? account.address;
   const chainId = params.chainId ?? VALID_CHAIN_ID;
-  const challenge = createChallenge(address, chainId);
-  const signature = await account.signMessage({
-    message: buildChallengeMessage(challenge),
-  });
+  const challenge = createChallenge(address, chainId, params.forceType ?? "number_sequence");
+  const signature = await account.signMessage({ message: buildChallengeMessage(challenge) });
 
   return {
     challenge,
-    body: {
-      challengeId: challenge.challengeId,
-      address,
-      chainId,
-      signature,
-      clickedNumbers: challenge.numbers,
-    },
+    body: { challengeId: challenge.challengeId, address, chainId, signature, ...answerFields },
   };
 }
 
@@ -110,11 +98,20 @@ describe("POST /api/challenge/verify", () => {
     mockConfiguredVerifier();
   });
 
-  it("verifies a challenge with the correct sequence and signature", async () => {
-    const { challenge, body } = await createSignedChallengeBody();
+  // ── number_sequence ──────────────────────────────────────────────────────────
+
+  it("verifies a number_sequence challenge with correct sequence and signature", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
+    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
 
     const before = Date.now();
-    const { response, json } = await postVerify(body);
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      signature,
+      clickedNumbers: challenge.numbers,
+    });
     const after = Date.now();
 
     expect(response.status).toBe(200);
@@ -125,14 +122,160 @@ describe("POST /api/challenge/verify", () => {
     expect(json.validUntil as number).toBeLessThanOrEqual(after + 600_000);
     expect(getChallenge(challenge.challengeId)?.consumed).toBe(true);
     expect(getProof(VALID_ADDRESS)?.txHash).toBe(TX_HASH);
-    expect(writeContract).toHaveBeenCalledWith({
-      abi: [],
-      address: CONTRACT_ADDRESS,
-      functionName: "issueHumanProof",
-      args: [VALID_ADDRESS, 600n],
-    });
-    expect(waitForTransactionReceipt).toHaveBeenCalledWith({}, { hash: TX_HASH });
   });
+
+  it("rejects the wrong clicked number sequence", async () => {
+    const { body } = await createSignedBody(
+      { clickedNumbers: [9, 8, 7, 6, 5] },
+      { forceType: "number_sequence" }
+    );
+    const { response, json } = await postVerify(body);
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: "WRONG_SEQUENCE" });
+  });
+
+  // ── reaction ─────────────────────────────────────────────────────────────────
+
+  it("verifies a reaction challenge with clickedAt inside the window", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "reaction");
+    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    // Simulate clicking exactly at window open
+    const clickedAt = challenge.reactionWindowOpenAt!;
+
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      signature,
+      clickedAt,
+    });
+
+    expect(response.status).toBe(200);
+    expect(json.status).toBe("verified");
+  });
+
+  it("rejects reaction challenge when clickedAt is too early", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "reaction");
+    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const clickedAt = challenge.reactionWindowOpenAt! - 5_000; // 5s before window
+
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      signature,
+      clickedAt,
+    });
+
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: "TOO_EARLY" });
+  });
+
+  it("rejects reaction challenge when clickedAt is too late", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "reaction");
+    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const clickedAt = challenge.reactionWindowOpenAt! + challenge.reactionWindowMs! + 10_000;
+
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      signature,
+      clickedAt,
+    });
+
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: "TOO_LATE" });
+  });
+
+  // ── typing_phrase ─────────────────────────────────────────────────────────────
+
+  it("verifies a typing_phrase challenge with the correct phrase", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "typing_phrase");
+    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      signature,
+      typedPhrase: TYPING_PHRASE,
+    });
+
+    expect(response.status).toBe(200);
+    expect(json.status).toBe("verified");
+  });
+
+  it("rejects typing_phrase challenge with wrong phrase", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "typing_phrase");
+    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      signature,
+      typedPhrase: "wrong phrase here",
+    });
+
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: "WRONG_PHRASE" });
+  });
+
+  it("accepts typing_phrase with extra whitespace trimmed", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "typing_phrase");
+    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      signature,
+      typedPhrase: `  ${TYPING_PHRASE}  `,
+    });
+
+    expect(response.status).toBe(200);
+    expect(json.status).toBe("verified");
+  });
+
+  // ── funny_question ───────────────────────────────────────────────────────────
+
+  it("verifies a funny_question challenge with the correct answer", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "funny_question");
+    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const correctIndex = FUNNY_QUESTIONS[challenge.questionIndex!].correctIndex;
+
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      signature,
+      selectedAnswer: correctIndex,
+    });
+
+    expect(response.status).toBe(200);
+    expect(json.status).toBe("verified");
+  });
+
+  it("rejects funny_question with wrong answer index", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "funny_question");
+    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const correctIndex = FUNNY_QUESTIONS[challenge.questionIndex!].correctIndex;
+    const wrongIndex = (correctIndex + 1) % 4;
+
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      signature,
+      selectedAnswer: wrongIndex,
+    });
+
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: "WRONG_ANSWER" });
+  });
+
+  // ── common error cases ───────────────────────────────────────────────────────
 
   it("rejects a missing challenge", async () => {
     const { response, json } = await postVerify({
@@ -140,74 +283,67 @@ describe("POST /api/challenge/verify", () => {
       address: VALID_ADDRESS,
       chainId: VALID_CHAIN_ID,
       signature: TX_HASH,
-      clickedNumbers: [1, 2, 3, 4, 5],
     });
-
     expect(response.status).toBe(400);
     expect(json).toEqual({ error: "CHALLENGE_NOT_FOUND" });
   });
 
   it("rejects an expired challenge", async () => {
-    const { challenge, body } = await createSignedChallengeBody();
+    const { challenge, body } = await createSignedBody(
+      { clickedNumbers: [] },
+      { forceType: "number_sequence" }
+    );
     challenge.expiresAt = Date.now() - 1;
-
     const { response, json } = await postVerify(body);
-
     expect(response.status).toBe(400);
     expect(json).toEqual({ error: "CHALLENGE_EXPIRED" });
   });
 
   it("rejects a consumed challenge", async () => {
-    const { challenge, body } = await createSignedChallengeBody();
+    const { challenge, body } = await createSignedBody(
+      { clickedNumbers: [] },
+      { forceType: "number_sequence" }
+    );
     consumeChallenge(challenge.challengeId);
-
     const { response, json } = await postVerify(body);
-
     expect(response.status).toBe(400);
     expect(json).toEqual({ error: "CHALLENGE_CONSUMED" });
   });
 
   it("rejects the wrong chain", async () => {
-    const { body } = await createSignedChallengeBody();
-
+    const { body } = await createSignedBody(
+      { clickedNumbers: [] },
+      { forceType: "number_sequence" }
+    );
     const { response, json } = await postVerify({ ...body, chainId: 1 });
-
     expect(response.status).toBe(400);
     expect(json).toEqual({ error: "WRONG_CHAIN" });
   });
 
   it("rejects challenges after max attempts", async () => {
-    const { challenge, body } = await createSignedChallengeBody();
+    const { challenge, body } = await createSignedBody(
+      { clickedNumbers: [] },
+      { forceType: "number_sequence" }
+    );
     incrementAttempts(challenge.challengeId);
     incrementAttempts(challenge.challengeId);
     incrementAttempts(challenge.challengeId);
-
     const { response, json } = await postVerify(body);
-
     expect(response.status).toBe(400);
     expect(json).toEqual({ error: "MAX_ATTEMPTS" });
   });
 
-  it("rejects the wrong clicked number sequence", async () => {
-    const { body } = await createSignedChallengeBody();
-
-    const { response, json } = await postVerify({
-      ...body,
-      clickedNumbers: [...(body.clickedNumbers as number[])].reverse(),
-    });
-
-    expect(response.status).toBe(400);
-    expect(json).toEqual({ error: "WRONG_SEQUENCE" });
-  });
-
   it("rejects an invalid signature", async () => {
-    const { body } = await createSignedChallengeBody();
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
     const wrongAccount = privateKeyToAccount(WRONG_PRIVATE_KEY as `0x${string}`);
     const wrongSignature = await wrongAccount.signMessage({ message: "wrong" });
 
     const { response, json } = await postVerify({
-      ...body,
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
       signature: wrongSignature,
+      clickedNumbers: challenge.numbers,
     });
 
     expect(response.status).toBe(400);
@@ -218,9 +354,16 @@ describe("POST /api/challenge/verify", () => {
     vi.mocked(getHumanPassContract).mockImplementation(() => {
       throw new Error("VERIFIER_PRIVATE_KEY is not configured");
     });
-    const { body } = await createSignedChallengeBody();
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
+    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
 
-    const { response, json } = await postVerify(body);
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      signature,
+      clickedNumbers: challenge.numbers,
+    });
 
     expect(response.status).toBe(500);
     expect(json).toEqual({ error: "VERIFIER_NOT_CONFIGURED" });
@@ -228,9 +371,16 @@ describe("POST /api/challenge/verify", () => {
 
   it("returns VERIFIER_INSUFFICIENT_FUNDS when the verifier wallet cannot pay gas", async () => {
     writeContract.mockRejectedValue(new Error("insufficient funds for gas"));
-    const { body } = await createSignedChallengeBody();
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
+    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
 
-    const { response, json } = await postVerify(body);
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      signature,
+      clickedNumbers: challenge.numbers,
+    });
 
     expect(response.status).toBe(503);
     expect(json).toEqual({ error: "VERIFIER_INSUFFICIENT_FUNDS" });

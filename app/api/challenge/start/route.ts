@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   buildChallengeMessage,
+  FUNNY_QUESTIONS,
   MONAD_TESTNET_CHAIN_ID,
 } from "@/lib/server/challenge-schema";
 import { createChallenge } from "@/lib/server/challenge-store";
@@ -32,11 +33,36 @@ export async function POST(request: Request) {
 
   const challenge = createChallenge(body.address, body.chainId);
 
-  return NextResponse.json({
+  const base = {
     challengeId: challenge.challengeId,
     nonce: challenge.nonce,
     expiresAt: challenge.expiresAt,
-    numbers: challenge.numbers,
+    type: challenge.type,
     message: buildChallengeMessage(challenge),
-  });
+  };
+
+  switch (challenge.type) {
+    case "number_sequence":
+      return NextResponse.json({ ...base, numbers: challenge.numbers });
+
+    case "reaction":
+      return NextResponse.json({
+        ...base,
+        delayMs: challenge.reactionDelayMs,
+        windowMs: challenge.reactionWindowMs,
+      });
+
+    case "typing_phrase":
+      return NextResponse.json({ ...base, phrase: challenge.expectedPhrase });
+
+    case "funny_question": {
+      const q = FUNNY_QUESTIONS[challenge.questionIndex!];
+      return NextResponse.json({
+        ...base,
+        question: q.question,
+        options: q.options,
+        // correctIndex intentionally omitted
+      });
+    }
+  }
 }

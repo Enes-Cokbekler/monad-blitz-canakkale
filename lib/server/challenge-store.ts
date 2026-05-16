@@ -2,7 +2,10 @@ import { randomBytes, randomUUID } from "crypto";
 
 import {
   CHALLENGE_TTL_MS,
+  FUNNY_QUESTIONS,
+  TYPING_PHRASE,
   type ChallengeSession,
+  type ChallengeType,
 } from "@/lib/server/challenge-schema";
 
 type ChallengeStore = {
@@ -20,6 +23,13 @@ const challengeStore =
     activeChallengesByWallet: new Map<string, string>(),
   };
 
+const CHALLENGE_TYPES: ChallengeType[] = [
+  "number_sequence",
+  "reaction",
+  "typing_phrase",
+  "funny_question",
+];
+
 function walletKey(address: string) {
   return address.toLowerCase();
 }
@@ -34,33 +44,70 @@ function createNonce() {
 
 function createNumbers() {
   const digits = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-
-  for (let index = digits.length - 1; index > 0; index -= 1) {
-    const swapIndex = randomBytes(1)[0] % (index + 1);
-    [digits[index], digits[swapIndex]] = [digits[swapIndex], digits[index]];
+  for (let i = digits.length - 1; i > 0; i--) {
+    const j = randomBytes(1)[0] % (i + 1);
+    [digits[i], digits[j]] = [digits[j], digits[i]];
   }
-
   return digits.slice(0, 5);
 }
 
-export function createChallenge(address: string, chainId: number) {
-  const key = walletKey(address);
-  const previousChallengeId = challengeStore.activeChallengesByWallet.get(key);
+function randomInt(min: number, max: number) {
+  return min + (randomBytes(1)[0] % (max - min + 1));
+}
 
-  if (previousChallengeId) {
-    consumeChallenge(previousChallengeId);
-  }
+function pickRandomType(): ChallengeType {
+  return CHALLENGE_TYPES[randomBytes(1)[0] % CHALLENGE_TYPES.length];
+}
 
-  const challenge: ChallengeSession = {
+function buildSession(
+  address: string,
+  chainId: number,
+  type: ChallengeType
+): ChallengeSession {
+  const base: ChallengeSession = {
     challengeId: randomUUID(),
     nonce: createNonce(),
-    numbers: createNumbers(),
     expiresAt: Date.now() + CHALLENGE_TTL_MS,
     attempts: 0,
     consumed: false,
     address,
     chainId,
+    type,
+    numbers: [],
   };
+
+  switch (type) {
+    case "number_sequence":
+      base.numbers = createNumbers();
+      break;
+    case "reaction": {
+      const delayMs = randomInt(1500, 4000);
+      const windowMs = randomInt(1000, 1500);
+      base.reactionDelayMs = delayMs;
+      base.reactionWindowMs = windowMs;
+      base.reactionWindowOpenAt = Date.now() + delayMs;
+      break;
+    }
+    case "typing_phrase":
+      base.expectedPhrase = TYPING_PHRASE;
+      break;
+    case "funny_question":
+      base.questionIndex = randomBytes(1)[0] % FUNNY_QUESTIONS.length;
+      break;
+  }
+
+  return base;
+}
+
+export function createChallenge(address: string, chainId: number, forceType?: ChallengeType) {
+  const key = walletKey(address);
+  const previousChallengeId = challengeStore.activeChallengesByWallet.get(key);
+  if (previousChallengeId) {
+    consumeChallenge(previousChallengeId);
+  }
+
+  const type = forceType ?? pickRandomType();
+  const challenge = buildSession(address, chainId, type);
 
   challengeStore.challenges.set(challenge.challengeId, challenge);
   challengeStore.activeChallengesByWallet.set(key, challenge.challengeId);
@@ -74,51 +121,34 @@ export function getChallenge(challengeId: string) {
 
 export function consumeChallenge(challengeId: string) {
   const challenge = challengeStore.challenges.get(challengeId);
-
-  if (!challenge) {
-    return undefined;
-  }
+  if (!challenge) return undefined;
 
   challenge.consumed = true;
-
   if (
     challengeStore.activeChallengesByWallet.get(walletKey(challenge.address)) ===
     challengeId
   ) {
     challengeStore.activeChallengesByWallet.delete(walletKey(challenge.address));
   }
-
   return challenge;
 }
 
 export function incrementAttempts(challengeId: string) {
   const challenge = challengeStore.challenges.get(challengeId);
-
-  if (!challenge) {
-    return undefined;
-  }
-
+  if (!challenge) return undefined;
   challenge.attempts += 1;
-
   return challenge;
 }
 
 export function getActiveChallenge(address: string) {
-  const challengeId = challengeStore.activeChallengesByWallet.get(
-    walletKey(address)
-  );
-
-  if (!challengeId) {
-    return undefined;
-  }
+  const challengeId = challengeStore.activeChallengesByWallet.get(walletKey(address));
+  if (!challengeId) return undefined;
 
   const challenge = challengeStore.challenges.get(challengeId);
-
   if (!challenge || !isActive(challenge)) {
     challengeStore.activeChallengesByWallet.delete(walletKey(address));
     return undefined;
   }
-
   return challenge;
 }
 

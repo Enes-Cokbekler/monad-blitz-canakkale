@@ -1,22 +1,71 @@
 export const CHALLENGE_TTL_MS = 120_000;
 export const MONAD_TESTNET_CHAIN_ID = 10143;
+export const TYPING_PHRASE = "kim jong un'dan nefret ediyorum";
+
+export type ChallengeType =
+  | "number_sequence"
+  | "reaction"
+  | "typing_phrase"
+  | "funny_question";
+
+export type FunnyQuestion = {
+  question: string;
+  options: string[];
+  correctIndex: number;
+};
+
+export const FUNNY_QUESTIONS: FunnyQuestion[] = [
+  {
+    question: "Which behavior is the most human?",
+    options: [
+      'Saying "I will sleep early" and sleeping at 3 AM',
+      "Never making typos",
+      "Charging with USB-C",
+      "Calculating hashes emotionally",
+    ],
+    correctIndex: 0,
+  },
+  {
+    question: "What is the most realistic hackathon meal?",
+    options: [
+      "Balanced salad",
+      "Cold pizza and energy drink",
+      "Five-course dinner",
+      "Air",
+    ],
+    correctIndex: 1,
+  },
+  {
+    question: "What would a bot never understand?",
+    options: [
+      "Merge conflicts at 4 AM",
+      "Gas fees",
+      "JSON",
+      "Binary",
+    ],
+    correctIndex: 0,
+  },
+];
 
 export type ChallengeSession = {
   challengeId: string;
   nonce: string;
-  numbers: number[];
   expiresAt: number;
   attempts: number;
   consumed: boolean;
   address: string;
   chainId: number;
-};
-
-export type ChallengeStartResponse = Pick<
-  ChallengeSession,
-  "challengeId" | "nonce" | "expiresAt" | "numbers"
-> & {
-  message: string;
+  type: ChallengeType;
+  // number_sequence
+  numbers: number[];
+  // reaction
+  reactionDelayMs?: number;
+  reactionWindowMs?: number;
+  reactionWindowOpenAt?: number;
+  // typing_phrase
+  expectedPhrase?: string;
+  // funny_question
+  questionIndex?: number;
 };
 
 export function buildChallengeMessage(challenge: ChallengeSession) {
@@ -25,8 +74,8 @@ export function buildChallengeMessage(challenge: ChallengeSession) {
     `Wallet: ${challenge.address}`,
     `Chain: ${challenge.chainId}`,
     `Challenge: ${challenge.challengeId}`,
+    `Type: ${challenge.type}`,
     `Nonce: ${challenge.nonce}`,
-    `Numbers: ${challenge.numbers.join(",")}`,
     `Expires: ${challenge.expiresAt}`,
   ].join("\n");
 }

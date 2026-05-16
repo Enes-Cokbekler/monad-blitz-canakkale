@@ -10,7 +10,11 @@ import {
 import { waitForTransactionReceipt } from "viem/actions";
 
 import { monadTestnet } from "@/lib/chains/monad";
-import { buildChallengeMessage } from "@/lib/server/challenge-schema";
+import {
+  buildChallengeMessage,
+  FUNNY_QUESTIONS,
+  type ChallengeSession,
+} from "@/lib/server/challenge-schema";
 import {
   consumeChallenge,
   getChallenge,
@@ -21,13 +25,21 @@ import { getHumanPassContract } from "@/lib/server/verifier-client";
 
 const PROOF_DURATION_SECONDS = 600n;
 const PROOF_DURATION_MS = 600_000;
+const REACTION_TOLERANCE_MS = 2_000;
 
 type VerifyChallengeRequest = {
   challengeId?: unknown;
   address?: unknown;
   chainId?: unknown;
   signature?: unknown;
+  // number_sequence
   clickedNumbers?: unknown;
+  // reaction
+  clickedAt?: unknown;
+  // typing_phrase
+  typedPhrase?: unknown;
+  // funny_question
+  selectedAnswer?: unknown;
 };
 
 type HumanPassContract = {
@@ -52,8 +64,50 @@ function sequencesMatch(expected: number[], actual: unknown) {
   return (
     Array.isArray(actual) &&
     actual.length === expected.length &&
-    actual.every((number, index) => number === expected[index])
+    actual.every((n, i) => n === expected[i])
   );
+}
+
+function validateAnswer(
+  challenge: ChallengeSession,
+  body: VerifyChallengeRequest
+): string | null {
+  switch (challenge.type) {
+    case "number_sequence":
+      if (!sequencesMatch(challenge.numbers, body.clickedNumbers)) {
+        return "WRONG_SEQUENCE";
+      }
+      return null;
+
+    case "reaction": {
+      if (typeof body.clickedAt !== "number") return "WRONG_ANSWER";
+      const windowOpen = challenge.reactionWindowOpenAt!;
+      const windowClose = windowOpen + challenge.reactionWindowMs!;
+      if (body.clickedAt < windowOpen - REACTION_TOLERANCE_MS) return "TOO_EARLY";
+      if (body.clickedAt > windowClose + REACTION_TOLERANCE_MS) return "TOO_LATE";
+      return null;
+    }
+
+    case "typing_phrase": {
+      if (typeof body.typedPhrase !== "string") return "WRONG_ANSWER";
+      const expected = challenge.expectedPhrase!.trim().toLowerCase();
+      const actual = body.typedPhrase.trim().toLowerCase();
+      if (actual !== expected) return "WRONG_PHRASE";
+      return null;
+    }
+
+    case "funny_question": {
+      if (
+        typeof body.selectedAnswer !== "number" ||
+        !Number.isInteger(body.selectedAnswer)
+      ) {
+        return "WRONG_ANSWER";
+      }
+      const q = FUNNY_QUESTIONS[challenge.questionIndex!];
+      if (body.selectedAnswer !== q.correctIndex) return "WRONG_ANSWER";
+      return null;
+    }
+  }
 }
 
 function isVerifierConfigurationError(error: unknown) {
@@ -115,8 +169,9 @@ export async function POST(request: NextRequest) {
 
   incrementAttempts(challenge.challengeId);
 
-  if (!sequencesMatch(challenge.numbers, body.clickedNumbers)) {
-    return NextResponse.json({ error: "WRONG_SEQUENCE" }, { status: 400 });
+  const answerError = validateAnswer(challenge, body);
+  if (answerError) {
+    return NextResponse.json({ error: answerError }, { status: 400 });
   }
 
   if (typeof body.signature !== "string") {
@@ -144,12 +199,8 @@ export async function POST(request: NextRequest) {
     contract = getHumanPassContract() as unknown as HumanPassContract;
   } catch (error) {
     if (isVerifierConfigurationError(error)) {
-      return NextResponse.json(
-        { error: "VERIFIER_NOT_CONFIGURED" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "VERIFIER_NOT_CONFIGURED" }, { status: 500 });
     }
-
     throw error;
   }
 
@@ -166,14 +217,11 @@ export async function POST(request: NextRequest) {
     receipt = await waitForTransactionReceipt(publicClient, { hash: txHash });
   } catch (error) {
     if (isVerifierInsufficientFundsError(error)) {
-      return NextResponse.json(
-        { error: "VERIFIER_INSUFFICIENT_FUNDS" },
-        { status: 503 }
-      );
+      return NextResponse.json({ error: "VERIFIER_INSUFFICIENT_FUNDS" }, { status: 503 });
     }
-
     throw error;
   }
+
   const validUntil = Date.now() + PROOF_DURATION_MS;
 
   consumeChallenge(challenge.challengeId);
