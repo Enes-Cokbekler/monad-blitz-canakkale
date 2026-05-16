@@ -73,14 +73,3 @@ export type ChallengeSession = {
   questionIndex?: number;
 };
 
-export function buildChallengeMessage(challenge: ChallengeSession) {
-  return [
-    "HumanPass challenge",
-    `Wallet: ${challenge.address}`,
-    `Chain: ${challenge.chainId}`,
-    `Challenge: ${challenge.challengeId}`,
-    `Type: ${challenge.type}`,
-    `Nonce: ${challenge.nonce}`,
-    `Expires: ${challenge.expiresAt}`,
-  ].join("\n");
-}

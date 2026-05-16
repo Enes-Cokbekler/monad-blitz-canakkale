@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import {
-  buildChallengeMessage,
   FUNNY_QUESTIONS,
   MONAD_TESTNET_CHAIN_ID,
 } from "@/lib/server/challenge-schema";
@@ -36,9 +35,9 @@ export async function POST(request: Request) {
   const base = {
     challengeId: challenge.challengeId,
     nonce: challenge.nonce,
+    issuedAt: challenge.createdAt,
     expiresAt: challenge.expiresAt,
     type: challenge.type,
-    message: buildChallengeMessage(challenge),
   };
 
   switch (challenge.type) {

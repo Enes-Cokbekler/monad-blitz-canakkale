@@ -11,8 +11,13 @@ import { NumberSequenceChallenge } from "@/components/challenges/number-sequence
 import { ReactionChallenge } from "@/components/challenges/reaction-challenge";
 import { TypingPhraseChallenge } from "@/components/challenges/typing-phrase-challenge";
 import { FunnyQuestionChallenge } from "@/components/challenges/funny-question-challenge";
+import {
+  buildHumanPassVerificationMessage,
+  getHumanPassDomain,
+  getHumanPassTypes,
+} from "@/lib/eip712";
 import { humanPassAbi } from "@/lib/contracts/HumanPass.abi";
-import { useDemoAccount, useDemoSignMessage } from "@/lib/e2e-wallet";
+import { useDemoAccount, useDemoSignTypedData } from "@/lib/e2e-wallet";
 import { monadTestnet } from "@/lib/wagmi/config";
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_HUMANPASS_CONTRACT_ADDRESS;
@@ -23,9 +28,9 @@ type ChallengeType = "number_sequence" | "reaction" | "typing_phrase" | "funny_q
 type ChallengeData = {
   challengeId: string;
   nonce: string;
+  issuedAt: number;
   expiresAt: number;
   type: ChallengeType;
-  message: string;
   // number_sequence
   numbers?: number[];
   // reaction
@@ -78,7 +83,7 @@ function formatExpiry(validUntil: number): string {
 
 export default function VerifyPage() {
   const { address, isConnected, chainId } = useDemoAccount();
-  const { signMessageAsync } = useDemoSignMessage();
+  const { signTypedDataAsync } = useDemoSignTypedData();
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [challenge, setChallenge] = useState<ChallengeData | null>(null);
@@ -192,7 +197,18 @@ export default function VerifyPage() {
 
     let signature: string;
     try {
-      signature = await signMessageAsync({ message: challenge.message });
+      signature = await signTypedDataAsync({
+        domain: getHumanPassDomain(monadTestnet.id, CONTRACT_ADDRESS as `0x${string}` | undefined),
+        types: getHumanPassTypes(),
+        primaryType: "HumanPassVerification",
+        message: buildHumanPassVerificationMessage(
+          address as `0x${string}`,
+          challenge.challengeId,
+          challenge.nonce,
+          challenge.issuedAt,
+          challenge.expiresAt,
+        ),
+      });
     } catch (err) {
       setPhase("challenge");
       if (err instanceof Error && err.name === "UserRejectedRequestError") {
@@ -278,7 +294,7 @@ export default function VerifyPage() {
       setError(err instanceof Error ? err.message : "VERIFY_FAILED");
       setErrorCode("VERIFY_FAILED");
     }
-  }, [challenge, address, signMessageAsync]);
+  }, [challenge, address, signTypedDataAsync]);
 
   const handleChallengePass = useCallback((answer: ChallengeAnswer) => {
     handleSignAndVerify(answer);
@@ -546,7 +562,10 @@ export default function VerifyPage() {
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-monad-purple border-t-transparent" />
                 <h2 className="text-xl font-semibold text-text-primary">Sign the Message</h2>
                 <p className="max-w-md text-text-secondary">
-                  Challenge passed! Sign the message in your wallet to issue your HumanPass proof.
+                  Challenge passed! Sign the typed message in your wallet to request your HumanPass proof.
+                </p>
+                <p className="max-w-md text-xs text-text-muted">
+                  EIP-712 typed data — your wallet will show exactly what you are signing.
                 </p>
               </div>
             )}

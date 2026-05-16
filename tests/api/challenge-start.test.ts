@@ -39,24 +39,23 @@ describe("POST /api/challenge/start", () => {
     expect(response.status).toBe(200);
     expect(json.challengeId).toEqual(expect.any(String));
     expect(json.nonce).toMatch(/^[a-f0-9]{32}$/);
+    expect(json.issuedAt).toEqual(expect.any(Number));
     expect(json.expiresAt).toEqual(expect.any(Number));
+    expect(json.issuedAt as number).toBeLessThanOrEqual(json.expiresAt as number);
     expect(["number_sequence", "reaction", "typing_phrase", "funny_question"]).toContain(json.type);
-    expect(typeof json.message).toBe("string");
   });
 
-  it("message includes wallet, chain, challenge id, type, nonce, expiry", async () => {
+  it("issuedAt is close to now and expiresAt is 120 seconds after issuedAt", async () => {
+    const before = Date.now();
     const { json } = await postChallenge({
       address: VALID_ADDRESS,
       chainId: VALID_CHAIN_ID,
     });
+    const after = Date.now();
 
-    const message = json.message as string;
-    expect(message).toContain(`Wallet: ${VALID_ADDRESS}`);
-    expect(message).toContain(`Chain: ${VALID_CHAIN_ID}`);
-    expect(message).toContain(`Challenge: ${json.challengeId}`);
-    expect(message).toContain(`Type: ${json.type}`);
-    expect(message).toContain(`Nonce: ${json.nonce}`);
-    expect(message).toContain(`Expires: ${json.expiresAt}`);
+    expect(json.issuedAt as number).toBeGreaterThanOrEqual(before);
+    expect(json.issuedAt as number).toBeLessThanOrEqual(after);
+    expect(json.expiresAt as number).toBeCloseTo((json.issuedAt as number) + 120_000, -2);
   });
 
   it("number_sequence challenge returns 5 numbers", async () => {

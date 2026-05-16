@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
 import { privateKeyToAccount } from "viem/accounts";
+import type { Address } from "viem";
 
 import { POST } from "@/app/api/challenge/verify/route";
 import {
-  buildChallengeMessage,
+  buildHumanPassVerificationMessage,
+  getHumanPassDomain,
+  getHumanPassTypes,
+} from "@/lib/eip712";
+import {
   FUNNY_QUESTIONS,
   TYPING_PHRASE,
 } from "@/lib/server/challenge-schema";
@@ -73,6 +78,31 @@ async function postVerify(body: unknown) {
   return { response, json };
 }
 
+async function signChallenge(
+  challenge: ReturnType<typeof createChallenge>,
+  signerAddress: string,
+  privateKey: string = TEST_PRIVATE_KEY,
+  overrideDomain?: { chainId?: number; verifyingContract?: Address },
+): Promise<`0x${string}`> {
+  const account = privateKeyToAccount(privateKey as `0x${string}`);
+  const domain = getHumanPassDomain(
+    overrideDomain?.chainId ?? challenge.chainId,
+    overrideDomain?.verifyingContract ?? (CONTRACT_ADDRESS as Address),
+  );
+  return account.signTypedData({
+    domain,
+    types: getHumanPassTypes(),
+    primaryType: "HumanPassVerification",
+    message: buildHumanPassVerificationMessage(
+      signerAddress as Address,
+      challenge.challengeId,
+      challenge.nonce,
+      challenge.createdAt,
+      challenge.expiresAt,
+    ),
+  });
+}
+
 async function createSignedBody(
   answerFields: Record<string, unknown>,
   params: { address?: string; chainId?: number; privateKey?: string; forceType?: "number_sequence" | "reaction" | "typing_phrase" | "funny_question" } = {}
@@ -82,7 +112,7 @@ async function createSignedBody(
   const address = params.address ?? account.address;
   const chainId = params.chainId ?? VALID_CHAIN_ID;
   const challenge = createChallenge(address, chainId, params.forceType ?? "number_sequence");
-  const signature = await account.signMessage({ message: buildChallengeMessage(challenge) });
+  const signature = await signChallenge(challenge, address, privateKey);
 
   return {
     challenge,
@@ -96,13 +126,14 @@ describe("POST /api/challenge/verify", () => {
     clearChallengesForTests();
     clearProofsForTests();
     mockConfiguredVerifier();
+    process.env.NEXT_PUBLIC_HUMANPASS_CONTRACT_ADDRESS = CONTRACT_ADDRESS;
   });
 
   // ── number_sequence ──────────────────────────────────────────────────────────
 
   it("verifies a number_sequence challenge with correct sequence and signature", async () => {
     const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
-    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const signature = await signChallenge(challenge, VALID_ADDRESS);
 
     const before = Date.now();
     const { response, json } = await postVerify({
@@ -139,7 +170,7 @@ describe("POST /api/challenge/verify", () => {
 
   it("verifies a reaction challenge with clickedAt inside the window", async () => {
     const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "reaction");
-    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const signature = await signChallenge(challenge, VALID_ADDRESS);
     // Simulate clicking exactly at window open
     const clickedAt = challenge.reactionWindowOpenAt!;
 
@@ -158,7 +189,7 @@ describe("POST /api/challenge/verify", () => {
 
   it("rejects reaction challenge when clickedAt is too early", async () => {
     const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "reaction");
-    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const signature = await signChallenge(challenge, VALID_ADDRESS);
     const clickedAt = challenge.reactionWindowOpenAt! - 5_000; // 5s before window
 
     const { response, json } = await postVerify({
@@ -176,7 +207,7 @@ describe("POST /api/challenge/verify", () => {
 
   it("rejects reaction challenge when clickedAt is too late", async () => {
     const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "reaction");
-    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const signature = await signChallenge(challenge, VALID_ADDRESS);
     const clickedAt = challenge.reactionWindowOpenAt! + challenge.reactionWindowMs! + 10_000;
 
     const { response, json } = await postVerify({
@@ -196,7 +227,7 @@ describe("POST /api/challenge/verify", () => {
 
   it("verifies a typing_phrase challenge with the correct phrase", async () => {
     const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "typing_phrase");
-    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const signature = await signChallenge(challenge, VALID_ADDRESS);
 
     const { response, json } = await postVerify({
       challengeId: challenge.challengeId,
@@ -213,7 +244,7 @@ describe("POST /api/challenge/verify", () => {
 
   it("rejects typing_phrase challenge with wrong phrase", async () => {
     const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "typing_phrase");
-    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const signature = await signChallenge(challenge, VALID_ADDRESS);
 
     const { response, json } = await postVerify({
       challengeId: challenge.challengeId,
@@ -230,7 +261,7 @@ describe("POST /api/challenge/verify", () => {
 
   it("accepts typing_phrase with extra whitespace trimmed", async () => {
     const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "typing_phrase");
-    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const signature = await signChallenge(challenge, VALID_ADDRESS);
 
     const { response, json } = await postVerify({
       challengeId: challenge.challengeId,
@@ -249,7 +280,7 @@ describe("POST /api/challenge/verify", () => {
 
   it("verifies a funny_question challenge with the correct answer", async () => {
     const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "funny_question");
-    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const signature = await signChallenge(challenge, VALID_ADDRESS);
     const correctIndex = FUNNY_QUESTIONS[challenge.questionIndex!].correctIndex;
 
     const { response, json } = await postVerify({
@@ -267,7 +298,7 @@ describe("POST /api/challenge/verify", () => {
 
   it("rejects funny_question with wrong answer index", async () => {
     const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "funny_question");
-    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const signature = await signChallenge(challenge, VALID_ADDRESS);
     const correctIndex = FUNNY_QUESTIONS[challenge.questionIndex!].correctIndex;
     const wrongIndex = (correctIndex + 1) % 4;
 
@@ -344,8 +375,7 @@ describe("POST /api/challenge/verify", () => {
 
   it("rejects an invalid signature", async () => {
     const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
-    const wrongAccount = privateKeyToAccount(WRONG_PRIVATE_KEY as `0x${string}`);
-    const wrongSignature = await wrongAccount.signMessage({ message: "wrong" });
+    const wrongSignature = await signChallenge(challenge, VALID_ADDRESS, WRONG_PRIVATE_KEY);
 
     const { response, json } = await postVerify({
       challengeId: challenge.challengeId,
@@ -365,7 +395,7 @@ describe("POST /api/challenge/verify", () => {
       throw new Error("VERIFIER_PRIVATE_KEY is not configured");
     });
     const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
-    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const signature = await signChallenge(challenge, VALID_ADDRESS);
 
     const { response, json } = await postVerify({
       challengeId: challenge.challengeId,
@@ -383,7 +413,7 @@ describe("POST /api/challenge/verify", () => {
   it("returns VERIFIER_INSUFFICIENT_FUNDS when the verifier wallet cannot pay gas", async () => {
     writeContract.mockRejectedValue(new Error("insufficient funds for gas"));
     const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
-    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const signature = await signChallenge(challenge, VALID_ADDRESS);
 
     const { response, json } = await postVerify({
       challengeId: challenge.challengeId,
@@ -423,7 +453,7 @@ describe("POST /api/challenge/verify", () => {
 
   it("prevents replay — second verify with same challengeId fails with CHALLENGE_ALREADY_USED", async () => {
     const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
-    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const signature = await signChallenge(challenge, VALID_ADDRESS);
     const body = {
       challengeId: challenge.challengeId,
       address: VALID_ADDRESS,
@@ -443,7 +473,7 @@ describe("POST /api/challenge/verify", () => {
 
   it("rejects wrong wallet address with INVALID_ADDRESS", async () => {
     const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
-    const signature = await TEST_ACCOUNT.signMessage({ message: buildChallengeMessage(challenge) });
+    const signature = await signChallenge(challenge, VALID_ADDRESS);
     const wrongAddress = "0x000000000000000000000000000000000000dead";
 
     const { response, json } = await postVerify({
@@ -467,5 +497,138 @@ describe("POST /api/challenge/verify", () => {
     const attemptsBefore = challenge.attempts;
     await postVerify({ ...body, nonce: "wrongnonce", clickedNumbers: challenge.numbers });
     expect(challenge.attempts).toBe(attemptsBefore);
+  });
+
+  // ── EIP-712 signature binding ──────────────────────────────────────────────────
+
+  it("rejects EIP-712 signature from wrong wallet (signed by different key)", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
+    // Sign with WRONG_PRIVATE_KEY — recovered address != VALID_ADDRESS
+    const signature = await signChallenge(challenge, VALID_ADDRESS, WRONG_PRIVATE_KEY);
+
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
+      signature,
+      clickedNumbers: challenge.numbers,
+    });
+
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: "INVALID_SIGNATURE" });
+  });
+
+  it("rejects EIP-712 signature built with wrong challengeId", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
+    const domain = getHumanPassDomain(VALID_CHAIN_ID, CONTRACT_ADDRESS as Address);
+    const signature = await TEST_ACCOUNT.signTypedData({
+      domain,
+      types: getHumanPassTypes(),
+      primaryType: "HumanPassVerification",
+      message: buildHumanPassVerificationMessage(
+        VALID_ADDRESS as Address,
+        "wrong-challenge-id",
+        challenge.nonce,
+        challenge.createdAt,
+        challenge.expiresAt,
+      ),
+    });
+
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
+      signature,
+      clickedNumbers: challenge.numbers,
+    });
+
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: "INVALID_SIGNATURE" });
+  });
+
+  it("rejects EIP-712 signature built with wrong nonce", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
+    const domain = getHumanPassDomain(VALID_CHAIN_ID, CONTRACT_ADDRESS as Address);
+    const signature = await TEST_ACCOUNT.signTypedData({
+      domain,
+      types: getHumanPassTypes(),
+      primaryType: "HumanPassVerification",
+      message: buildHumanPassVerificationMessage(
+        VALID_ADDRESS as Address,
+        challenge.challengeId,
+        "wrong-nonce",
+        challenge.createdAt,
+        challenge.expiresAt,
+      ),
+    });
+
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
+      signature,
+      clickedNumbers: challenge.numbers,
+    });
+
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: "INVALID_SIGNATURE" });
+  });
+
+  it("rejects EIP-712 signature built with wrong chainId in domain", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
+    // Sign with chainId=1 (mainnet) instead of Monad Testnet
+    const signature = await signChallenge(challenge, VALID_ADDRESS, TEST_PRIVATE_KEY, { chainId: 1 });
+
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
+      signature,
+      clickedNumbers: challenge.numbers,
+    });
+
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: "INVALID_SIGNATURE" });
+  });
+
+  it("rejects EIP-712 signature built with wrong verifyingContract", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
+    const wrongContract = "0x000000000000000000000000000000000000dead" as Address;
+    const signature = await signChallenge(challenge, VALID_ADDRESS, TEST_PRIVATE_KEY, {
+      verifyingContract: wrongContract,
+    });
+
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
+      signature,
+      clickedNumbers: challenge.numbers,
+    });
+
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: "INVALID_SIGNATURE" });
+  });
+
+  it("rejects plain signMessage (non-EIP-712) as INVALID_SIGNATURE", async () => {
+    const challenge = createChallenge(VALID_ADDRESS, VALID_CHAIN_ID, "number_sequence");
+    const plainSignature = await TEST_ACCOUNT.signMessage({ message: "not typed data" });
+
+    const { response, json } = await postVerify({
+      challengeId: challenge.challengeId,
+      address: VALID_ADDRESS,
+      chainId: VALID_CHAIN_ID,
+      nonce: challenge.nonce,
+      signature: plainSignature,
+      clickedNumbers: challenge.numbers,
+    });
+
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: "INVALID_SIGNATURE" });
   });
 });

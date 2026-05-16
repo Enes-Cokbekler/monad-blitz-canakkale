@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   createPublicClient,
+  getAddress,
   http,
-  recoverMessageAddress,
+  isAddress,
   type Abi,
   type Address,
   type Hash,
 } from "viem";
 import { waitForTransactionReceipt } from "viem/actions";
 
+import { verifyHumanPassSignature } from "@/lib/eip712";
 import { monadTestnet } from "@/lib/chains/monad";
 import {
-  buildChallengeMessage,
   FUNNY_QUESTIONS,
   type ChallengeSession,
 } from "@/lib/server/challenge-schema";
@@ -185,12 +186,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "INVALID_SIGNATURE" }, { status: 400 });
   }
 
+  const contractEnv = process.env.NEXT_PUBLIC_HUMANPASS_CONTRACT_ADDRESS;
+  const verifyingContract =
+    contractEnv && isAddress(contractEnv) ? getAddress(contractEnv) : undefined;
+
   let recovered: string;
 
   try {
-    recovered = await recoverMessageAddress({
-      message: buildChallengeMessage(challenge),
+    recovered = await verifyHumanPassSignature({
+      wallet: body.address as Address,
+      challengeId: challenge.challengeId,
+      nonce: challenge.nonce,
+      issuedAt: challenge.createdAt,
+      expiresAt: challenge.expiresAt,
       signature: body.signature as `0x${string}`,
+      chainId: challenge.chainId,
+      verifyingContract,
     });
   } catch {
     return NextResponse.json({ error: "INVALID_SIGNATURE" }, { status: 400 });

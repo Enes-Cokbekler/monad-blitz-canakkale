@@ -78,7 +78,7 @@ Each verification session has multiple layers of server-side protection:
 | **One-time use** | `consumed` flag set immediately after a successful proof issuance. A second verify request with the same `challengeId` returns `CHALLENGE_ALREADY_USED`. |
 | **Attempt limit** | Max 3 attempts per session (`maxAttempts`). Wrong answers increment the counter; wrong nonce does not. |
 | **Address binding** | `challengeId` is tied to a wallet address. Cross-address use returns `INVALID_ADDRESS`. |
-| **Signature binding** | The signed message includes wallet, chain, challengeId, type, nonce, and expiry. Signature recovery is checked against the submitted address. |
+| **Signature binding** | EIP-712 typed data signature includes wallet, chain, challengeId, nonce, issuedAt, expiresAt, and purpose. Signer recovery is checked against the submitted address. |
 | **Chain binding** | `chainId` in the request must match the session's `chainId`. |
 
 Error codes returned by `POST /api/challenge/verify`:
@@ -94,6 +94,44 @@ Error codes returned by `POST /api/challenge/verify`:
 | `INVALID_SIGNATURE` | Signature recovery failed or wrong signer |
 
 **MVP caveat:** Challenge state is in-memory. In a serverless or multi-instance deployment, replace the in-memory store with Redis.
+
+---
+
+## EIP-712 Signature Flow
+
+HumanPass uses EIP-712 typed data signatures instead of plain `eth_sign`. This gives users clear visibility into what they are signing and lets the backend bind each signature to a specific session.
+
+### Typed data structure
+
+```
+HumanPassVerification:
+  wallet:      address   — the connected wallet
+  challengeId: string    — the unique session ID
+  nonce:       string    — 16-byte random hex, prevents fixation
+  issuedAt:    uint256   — challenge creation timestamp (ms)
+  expiresAt:   uint256   — challenge expiry timestamp (ms)
+  purpose:     string    — "Request HumanPass proof"
+```
+
+### Domain
+
+```
+name:              "HumanPass"
+version:           "1"
+chainId:           10143 (Monad Testnet)
+verifyingContract: <NEXT_PUBLIC_HUMANPASS_CONTRACT_ADDRESS>
+```
+
+### Security properties
+
+| Property | Effect |
+|---|---|
+| **Wallet binding** | Signature is tied to the signer's address. A different key produces a different recovered address → rejected. |
+| **Challenge binding** | `challengeId` in the typed data must match the server-stored challenge. Wrong ID → signature mismatch. |
+| **Nonce binding** | `nonce` in the typed data must match the server-stored nonce. Prevents cross-session replay. |
+| **Chain binding** | `chainId` in the EIP-712 domain is Monad Testnet. Signatures produced on other chains are invalid. |
+| **Contract binding** | `verifyingContract` is the HumanPass contract. Cross-contract replay is blocked. |
+| **Plain-text rejection** | `eth_sign` or arbitrary message signatures are rejected — only correctly structured typed data is accepted. |
 
 ---
 

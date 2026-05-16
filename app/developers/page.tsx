@@ -77,6 +77,43 @@ export async function checkHuman(address: string): Promise<boolean> {
   });
 }`;
 
+const EIP712_SNIPPET = `// HumanPass uses EIP-712 typed data — users see exactly what they sign
+import { useSignTypedData } from "wagmi";
+
+const DOMAIN = {
+  name: "HumanPass",
+  version: "1",
+  chainId: 10143, // Monad Testnet
+  verifyingContract: "${CONTRACT_ADDRESS}",
+};
+
+const TYPES = {
+  HumanPassVerification: [
+    { name: "wallet",      type: "address" },
+    { name: "challengeId", type: "string"  },
+    { name: "nonce",       type: "string"  },
+    { name: "issuedAt",    type: "uint256" },
+    { name: "expiresAt",   type: "uint256" },
+    { name: "purpose",     type: "string"  },
+  ],
+};
+
+const { signTypedDataAsync } = useSignTypedData();
+
+const signature = await signTypedDataAsync({
+  domain: DOMAIN,
+  types: TYPES,
+  primaryType: "HumanPassVerification",
+  message: {
+    wallet: address,
+    challengeId: challenge.challengeId,
+    nonce: challenge.nonce,
+    issuedAt: BigInt(challenge.issuedAt),
+    expiresAt: BigInt(challenge.expiresAt),
+    purpose: "Request HumanPass proof",
+  },
+});`;
+
 function CodeBlock({ code }: { code: string }) {
   return (
     <pre className="overflow-x-auto rounded-lg border border-surface-border bg-surface-secondary p-4 text-xs leading-relaxed text-text-primary">
@@ -199,6 +236,30 @@ export default function DevelopersPage() {
               </li>
             ))}
           </ul>
+        </section>
+
+        {/* EIP-712 signature section */}
+        <section className="mb-10">
+          <h2 className="mb-3 text-xl font-bold text-text-primary">EIP-712 Typed Signatures</h2>
+          <p className="mb-4 text-sm text-text-secondary">
+            HumanPass uses EIP-712 typed data signatures so users know exactly what they are signing,
+            and the backend can bind each proof request to a specific wallet, challenge, nonce, chain,
+            and contract. Plain message signing is rejected.
+          </p>
+          <div className="mb-4 grid gap-3 sm:grid-cols-2">
+            {[
+              { label: "Wallet binding", body: "Signature is tied to the connected wallet address. A signature from a different key is rejected." },
+              { label: "Challenge binding", body: "Signed challengeId and nonce prevent cross-challenge or replayed signatures." },
+              { label: "Chain binding", body: "Domain chainId is Monad Testnet. Signatures from other chains are invalid." },
+              { label: "Contract binding", body: "Domain verifyingContract is the HumanPass contract address. Cross-contract replay is blocked." },
+            ].map((item) => (
+              <div key={item.label} className="rounded-lg border border-surface-border bg-surface-secondary p-4">
+                <p className="mb-1 text-xs font-semibold text-monad-cyan">{item.label}</p>
+                <p className="text-xs text-text-secondary">{item.body}</p>
+              </div>
+            ))}
+          </div>
+          <CodeBlock code={EIP712_SNIPPET} />
         </section>
 
         {/* Positioning note */}

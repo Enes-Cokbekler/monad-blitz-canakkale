@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAccount, useSignMessage } from "wagmi";
+import { useAccount, useSignMessage, useSignTypedData } from "wagmi";
 
 import { monadTestnet } from "@/lib/wagmi/config";
 
@@ -61,6 +61,23 @@ export function useDemoSignMessage() {
   if (hasMockWallet) {
     return {
       signMessageAsync: async () => `0x${"1".repeat(130)}` as `0x${string}`,
+    };
+  }
+
+  return signer;
+}
+
+export function useDemoSignTypedData() {
+  const signer = useSignTypedData();
+  const [hasMockWallet, setHasMockWallet] = useState(false);
+
+  useEffect(() => {
+    setHasMockWallet(Boolean(readMockWallet()));
+  }, []);
+
+  if (hasMockWallet) {
+    return {
+      signTypedDataAsync: async () => `0x${"1".repeat(130)}` as `0x${string}`,
     };
   }
 
