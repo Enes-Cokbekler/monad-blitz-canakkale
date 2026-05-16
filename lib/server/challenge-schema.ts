@@ -6,7 +6,8 @@ export type ChallengeType =
   | "number_sequence"
   | "reaction"
   | "typing_phrase"
-  | "funny_question";
+  | "funny_question"
+  | "camera_liveness";
 
 export type FunnyQuestion = {
   question: string;

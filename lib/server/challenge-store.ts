@@ -29,6 +29,7 @@ const CHALLENGE_TYPES: ChallengeType[] = [
   "reaction",
   "typing_phrase",
   "funny_question",
+  "camera_liveness",
 ];
 
 function walletKey(address: string) {
@@ -97,6 +98,9 @@ function buildSession(
       break;
     case "funny_question":
       base.questionIndex = randomBytes(1)[0] % FUNNY_QUESTIONS.length;
+      break;
+    case "camera_liveness":
+      // no server-side state needed; verification happens client-side via camera
       break;
   }
 

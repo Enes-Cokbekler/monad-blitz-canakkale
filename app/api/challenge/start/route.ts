@@ -16,6 +16,7 @@ const EVM_ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 type StartChallengeRequest = {
   address?: unknown;
   chainId?: unknown;
+  type?: unknown;
 };
 
 export async function POST(request: Request) {
@@ -42,7 +43,12 @@ export async function POST(request: Request) {
     return rateLimitResponse();
   }
 
-  const challenge = createChallenge(body.address, body.chainId);
+  const forceType =
+    typeof body.type === "string" && body.type === "camera_liveness"
+      ? "camera_liveness"
+      : undefined;
+
+  const challenge = createChallenge(body.address, body.chainId, forceType);
 
   const base = {
     challengeId: challenge.challengeId,
@@ -75,5 +81,7 @@ export async function POST(request: Request) {
         // correctIndex intentionally omitted
       });
     }
+    case "camera_liveness":
+      return NextResponse.json({ ...base });
   }
 }

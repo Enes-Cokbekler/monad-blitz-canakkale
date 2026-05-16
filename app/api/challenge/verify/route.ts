@@ -114,6 +114,12 @@ function validateAnswer(
       if (body.selectedAnswer !== q.correctIndex) return "WRONG_ANSWER";
       return null;
     }
+    case "camera_liveness": {
+      // Liveness verification is performed entirely client-side via camera.
+      // The backend trusts that the challenge session was created for this
+      // wallet and that the signature is valid. No extra answer payload needed.
+      return null;
+    }
   }
 }
 

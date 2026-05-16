@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useReadContract } from "wagmi";
 import { WalletConnect } from "@/components/wallet-connect";
 import { ErrorCallout } from "@/components/error-callout";
@@ -22,10 +23,15 @@ import { useDemoAccount, useDemoSignTypedData } from "@/lib/e2e-wallet";
 import { useMonadNetwork } from "@/hooks/use-monad-network";
 import { monadTestnet } from "@/lib/wagmi/config";
 
+const CameraLivenessChallenge = dynamic(
+  () => import("@/components/challenges/camera-liveness-challenge").then((m) => m.CameraLivenessChallenge),
+  { ssr: false, loading: () => <div className="py-12 text-center text-text-secondary">Loading camera…</div> }
+);
+
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_HUMANPASS_CONTRACT_ADDRESS;
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
-type ChallengeType = "number_sequence" | "reaction" | "typing_phrase" | "funny_question";
+type ChallengeType = "number_sequence" | "reaction" | "typing_phrase" | "funny_question" | "camera_liveness";
 
 type ChallengeData = {
   challengeId: string;
@@ -57,7 +63,8 @@ type ChallengeAnswer =
   | { type: "number_sequence"; clickedNumbers: number[] }
   | { type: "reaction"; clickedAt: number }
   | { type: "typing_phrase"; typedPhrase: string }
-  | { type: "funny_question"; selectedAnswer: number };
+  | { type: "funny_question"; selectedAnswer: number }
+  | { type: "camera_liveness" };
 
 type Phase =
   | "idle"
@@ -73,6 +80,7 @@ const CHALLENGE_TYPE_LABELS: Record<ChallengeType, string> = {
   reaction: "Reaction",
   typing_phrase: "Typing Phrase",
   funny_question: "Human Signal",
+  camera_liveness: "Camera Liveness",
 };
 
 function formatExpiry(validUntil: number): string {
@@ -158,7 +166,7 @@ export default function VerifyPage() {
     setVerifyResult(null);
   }, [address]);
 
-  const handleStartChallenge = useCallback(async () => {
+  const handleStartChallenge = useCallback(async (forceType?: ChallengeType) => {
     if (!address) return;
     setPhase("starting");
     setError(null);
@@ -169,7 +177,7 @@ export default function VerifyPage() {
       const res = await fetch("/api/challenge/start", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ address, chainId: monadTestnet.id }),
+        body: JSON.stringify({ address, chainId: monadTestnet.id, type: forceType }),
       });
 
       const data = await res.json();
@@ -229,7 +237,8 @@ export default function VerifyPage() {
       answer.type === "number_sequence" ? { clickedNumbers: answer.clickedNumbers } :
       answer.type === "reaction" ? { clickedAt: answer.clickedAt } :
       answer.type === "typing_phrase" ? { typedPhrase: answer.typedPhrase } :
-      { selectedAnswer: answer.selectedAnswer };
+      answer.type === "funny_question" ? { selectedAnswer: answer.selectedAnswer } :
+      {};
 
     try {
       const res = await fetch("/api/challenge/verify", {
@@ -305,11 +314,12 @@ export default function VerifyPage() {
   const handleChallengeFail = useCallback((reason: string) => {
     const newAttempts = attempts + 1;
     setAttempts(newAttempts);
-    if (newAttempts >= 3 || reason === "TOO_EARLY" || reason === "TOO_LATE" || reason === "TOO_MANY_ATTEMPTS") {
+    if (newAttempts >= 3 || reason === "TOO_EARLY" || reason === "TOO_LATE" || reason === "TOO_MANY_ATTEMPTS" || reason === "CAMERA_DENIED") {
       setPhase("error");
       setError(
         reason === "TOO_EARLY" ? "You clicked too early. Start a new challenge." :
         reason === "TOO_LATE" ? "You were too slow. Start a new challenge." :
+        reason === "CAMERA_DENIED" ? "Camera access denied. Please allow camera permissions and try again." :
         "Maximum attempts reached. Please start a new challenge."
       );
       setErrorCode(reason);
@@ -493,11 +503,16 @@ export default function VerifyPage() {
                 <span className="text-4xl">🛡️</span>
                 <h2 className="text-xl font-semibold text-text-primary">Ready to Verify?</h2>
                 <p className="max-w-md text-text-secondary">
-                  A random human-signal challenge will be selected. Complete it to receive your on-chain HumanPass proof.
+                  Choose a verification method to receive your on-chain HumanPass proof.
                 </p>
-                <button onClick={handleStartChallenge} className="btn-primary mt-2">
-                  Start Challenge
-                </button>
+                <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+                  <button onClick={() => handleStartChallenge()} className="btn-primary">
+                    Start Random Challenge
+                  </button>
+                  <button onClick={() => handleStartChallenge("camera_liveness")} className="btn-secondary">
+                    Verify with Camera
+                  </button>
+                </div>
               </div>
             )}
 
@@ -551,6 +566,13 @@ export default function VerifyPage() {
                     onPass={(selectedAnswer) =>
                       handleChallengePass({ type: "funny_question", selectedAnswer })
                     }
+                  />
+                )}
+
+                {challenge.type === "camera_liveness" && (
+                  <CameraLivenessChallenge
+                    onPass={() => handleChallengePass({ type: "camera_liveness" })}
+                    onFail={handleChallengeFail}
                   />
                 )}
               </div>
